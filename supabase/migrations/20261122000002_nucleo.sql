@@ -168,7 +168,8 @@ create trigger auditoria_membros after insert or update or delete on public.memb
 create trigger auditoria_acessos_suporte after insert or update or delete on public.acessos_suporte
   for each row execute function public.registrar_auditoria();
 
--- Plano, módulos e situação: só o admin da plataforma (fora de suporte).
+-- Plano, módulos e situação: só o admin da plataforma, e não na loja que ele
+-- está atendendo em suporte.
 -- Papéis de servidor (postgres, service_role) não passam por esta regra.
 create function public.proteger_campos_da_plataforma()
 returns trigger
@@ -179,7 +180,8 @@ begin
   if current_user in ('authenticated', 'anon')
      and (new.plano_id, new.modulos, new.situacao)
          is distinct from (old.plano_id, old.modulos, old.situacao)
-     and not (public.sou_admin_plataforma() and not public.em_suporte()) then
+     and not (public.sou_admin_plataforma()
+              and new.id is distinct from public.loja_em_suporte()) then
     raise exception 'Só o admin da plataforma altera plano, módulos e situação da loja'
       using errcode = '42501';
   end if;
@@ -204,8 +206,8 @@ create policy planos_leitura on public.planos
   for select to authenticated using (true);
 create policy planos_admin_escreve on public.planos
   for all to authenticated
-  using (public.sou_admin_plataforma() and not public.em_suporte())
-  with check (public.sou_admin_plataforma() and not public.em_suporte());
+  using (public.sou_admin_plataforma())
+  with check (public.sou_admin_plataforma());
 
 -- lojas
 create policy lojas_leitura on public.lojas
@@ -226,11 +228,13 @@ create policy lojas_dono_atualiza on public.lojas
   );
 create policy lojas_admin_insere on public.lojas
   for insert to authenticated
-  with check (public.sou_admin_plataforma() and not public.em_suporte());
+  with check (public.sou_admin_plataforma());
+-- Suporte é por loja: a loja sob suporte fica só leitura para o admin
+-- (inclusive situação/plano) até o acesso expirar; as demais seguem editáveis.
 create policy lojas_admin_atualiza on public.lojas
   for update to authenticated
-  using (public.sou_admin_plataforma() and not public.em_suporte())
-  with check (public.sou_admin_plataforma() and not public.em_suporte());
+  using (public.sou_admin_plataforma() and id is distinct from public.loja_em_suporte())
+  with check (public.sou_admin_plataforma() and id is distinct from public.loja_em_suporte());
 
 -- membros (uso por loja para o admin vem de função própria, Task 7)
 create policy membros_leitura on public.membros

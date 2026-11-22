@@ -1,5 +1,5 @@
 begin;
-select plan(17);
+select plan(21);
 
 -- Só nesta transação (rollback no fim): permite trocar de usuário
 -- estando já no papel authenticated.
@@ -113,8 +113,30 @@ select is((select count(*) from membros), 2::bigint,
 select is(meu_perfil(), 'dono'::perfil,
   'Admin em suporte tem perfil dono (só leitura)');
 select is_empty(
-  $$update lojas set nome = 'x' returning id$$,
-  'Admin em suporte não altera a loja');
+  format($$update lojas set nome = 'x' where id = %L returning id$$,
+         (select id from ids where chave = 'loja_a')),
+  'Admin em suporte não altera a loja A');
+select is_empty(
+  format($$update lojas set situacao = 'atrasado' where id = %L returning id$$,
+         (select id from ids where chave = 'loja_a')),
+  'Admin em suporte não altera a situação da loja A');
+
+-- Suporte é por loja: com A aberta, a plataforma segue editável para B e planos.
+update lojas set situacao = 'atrasado' where id = (select id from ids where chave = 'loja_b');
+update planos set limite_usuarios = 4 where nome = 'Teste';
+
+select testes.sair();
+select is(
+  (select situacao from lojas where id = (select id from ids where chave = 'loja_b')),
+  'atrasado'::situacao_loja,
+  'Com suporte aberto em A, admin altera a situação da loja B');
+select is(
+  (select limite_usuarios from planos where nome = 'Teste'), 4,
+  'Com suporte aberto em A, admin altera planos');
+select is(
+  (select situacao from lojas where id = (select id from ids where chave = 'loja_a')),
+  'em_dia'::situacao_loja,
+  'Loja A sob suporte segue intacta');
 
 -- Suporte expirado ------------------------------------------------------
 select testes.sair();
