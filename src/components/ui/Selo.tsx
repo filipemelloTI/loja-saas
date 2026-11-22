@@ -12,7 +12,7 @@ const TONS: Record<TomSelo, string> = {
 /** Etiqueta curta de situação (ex.: "Pronto", "Atrasado"). Sempre com texto, nunca só cor. */
 export function Selo({ tom = 'neutro', children }: { tom?: TomSelo; children: ReactNode }) {
   return (
-    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-sm font-semibold ${TONS[tom]}`}>
+    <span className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-sm font-semibold ${TONS[tom]}`}>
       {children}
     </span>
   )

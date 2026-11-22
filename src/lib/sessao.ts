@@ -16,6 +16,13 @@ export const contextoAtual = cache(async () => {
   return carregarContexto()
 })
 
+/** Guarda das páginas da plataforma: só o admin da plataforma; os demais voltam ao Início. */
+export async function exigirAdminPlataforma() {
+  const ctx = await contextoAtual()
+  if (!ctx?.adminPlataforma) redirect('/')
+  return ctx
+}
+
 /**
  * Guarda de área para páginas da loja: quem digitar a URL de uma área que não pode
  * ver (perfil ou módulo desligado) volta para o Início.
