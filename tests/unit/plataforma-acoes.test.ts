@@ -110,6 +110,40 @@ describe('criarLoja', () => {
     expect(cliente.auth.admin.deleteUser).toHaveBeenCalledWith('U1')
     expect(cliente.rpc).toHaveBeenCalledWith('desfazer_loja_nova', { p_loja: 'L1' })
   })
+
+  const ROLLBACK_INCOMPLETO =
+    'A criação falhou e não foi possível desfazer tudo. Anote o e-mail e verifique no painel do Supabase.'
+
+  function clienteMembroFalha(auth: Record<string, unknown> = {}) {
+    return clienteFalso(
+      { lojas: [{ data: { id: 'L1' }, error: null }], membros: [{ error: { message: 'falhou', code: 'XX000' } }] },
+      {
+        createUser: vi.fn(async () => ({ data: { user: { id: 'U1' } }, error: null })),
+        generateLink: vi.fn(async () => ({ data: { properties: { hashed_token: 'tok' } }, error: null })),
+        ...auth,
+      },
+    )
+  }
+
+  it('falha ao gravar o Dono e não consegue apagar o usuário: avisa que não desfez tudo e registra os ids', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const cliente = clienteMembroFalha({ deleteUser: vi.fn(async () => ({ error: { message: 'gotrue fora' } })) })
+    const r = await criarLojaCom(deps(cliente), formulario({}))
+    expect(r).toEqual({ ok: false, erro: ROLLBACK_INCOMPLETO })
+    expect(cliente.rpc).toHaveBeenCalledWith('desfazer_loja_nova', { p_loja: 'L1' })
+    expect(log).toHaveBeenCalledWith('criarLoja: rollback incompleto', { lojaId: 'L1', userId: 'U1', falhou: ['apagar usuário'] })
+    log.mockRestore()
+  })
+
+  it('falha ao gravar o Dono e não consegue apagar a loja: avisa que não desfez tudo', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const cliente = clienteMembroFalha()
+    cliente.rpc.mockResolvedValueOnce({ data: null, error: { message: 'falhou' } } as never)
+    const r = await criarLojaCom(deps(cliente), formulario({}))
+    expect(r).toEqual({ ok: false, erro: ROLLBACK_INCOMPLETO })
+    expect(log).toHaveBeenCalledWith('criarLoja: rollback incompleto', { lojaId: 'L1', userId: 'U1', falhou: ['apagar loja'] })
+    log.mockRestore()
+  })
 })
 
 describe('atualizarLoja', () => {

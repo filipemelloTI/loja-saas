@@ -27,6 +27,8 @@ const SITUACOES: Situacao[] = ['em_dia', 'atrasado', 'suspensa']
 
 const ACESSO_NEGADO = { ok: false, erro: 'Acesso negado' } as const
 const FALHA_CRIAR = 'Não foi possível criar a loja. Nada foi gravado; tente de novo.'
+const ROLLBACK_INCOMPLETO =
+  'A criação falhou e não foi possível desfazer tudo. Anote o e-mail e verifique no painel do Supabase.'
 
 type ErroBanco = { message: string; code?: string } | null
 
@@ -73,10 +75,18 @@ export async function criarLojaCom(deps: Dependencias, form: FormData): Promise<
 
   // Desfaz o que foi criado. O Dono é gravado por último e nada falha depois dele,
   // então o rollback nunca esbarra no trigger que protege o último Dono ativo.
+  // Se o próprio rollback falhar, avisa de verdade e registra os ids no servidor.
   const desfazer = async (userId: string | null, erro: string): Promise<ResultadoLink> => {
-    if (userId) await admin.auth.admin.deleteUser(userId)
-    await admin.rpc('desfazer_loja_nova', { p_loja: lojaId })
-    return { ok: false, erro }
+    const falhas: string[] = []
+    if (userId) {
+      const { error } = await admin.auth.admin.deleteUser(userId)
+      if (error) falhas.push('apagar usuário')
+    }
+    const { error } = await admin.rpc('desfazer_loja_nova', { p_loja: lojaId })
+    if (error) falhas.push('apagar loja')
+    if (falhas.length === 0) return { ok: false, erro }
+    console.error('criarLoja: rollback incompleto', { lojaId, userId, falhou: falhas })
+    return { ok: false, erro: ROLLBACK_INCOMPLETO }
   }
 
   const usuario = await admin.auth.admin.createUser({
