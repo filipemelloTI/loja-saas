@@ -11,7 +11,7 @@ describe('matcher do proxy', () => {
     }
   })
   it('ignora estáticos', () => {
-    for (const r of ['/logo.png', '/favicon.ico', '/_next/static/x.js', '/img/a.svg']) {
+    for (const r of ['/logo.png', '/favicon.ico', '/_next/static/x.js', '/img/a.svg', '/manifest.webmanifest']) {
       expect(re.test(r), r).toBe(false)
     }
   })

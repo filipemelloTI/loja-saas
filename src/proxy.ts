@@ -36,5 +36,5 @@ export async function proxy(request: NextRequest) {
 // Next exige que `config` seja literal estático, então o padrão vive em `src/lib/matcher.ts`
 // (testado) e é repetido aqui; o teste confere que os dois são idênticos.
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon\\.ico|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'],
 }
