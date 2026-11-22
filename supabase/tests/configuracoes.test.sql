@@ -106,8 +106,7 @@ where user_id = (select id from ids where chave = 'atendente');
 select testes.sair();
 update planos set limite_usuarios = 2 where nome = 'Teste Config';
 
-select testes.entrar_como((select id from ids where chave = 'dono'));
-
+-- Membro novo só entra pelo servidor (service role); o limite vale para ele também.
 select throws_ok(
   format($$insert into membros (loja_id, user_id, nome, perfil)
            values (%L, %L, 'Extra', 'atendente')$$,
@@ -115,6 +114,8 @@ select throws_ok(
          (select id from ids where chave = 'extra')),
   'P0001', 'Limite de usuários do plano atingido',
   'Com 2 ativos e limite 2, não entra o 3º membro');
+
+select testes.entrar_como((select id from ids where chave = 'dono'));
 select throws_ok(
   format($$update membros set ativo = true where user_id = %L$$,
          (select id from ids where chave = 'atendente')),
