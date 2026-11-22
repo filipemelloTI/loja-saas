@@ -21,8 +21,8 @@ export const esquemaMembro = z
     perfil: z.enum(['dono', 'tecnico', 'atendente'], { message: 'Perfil inválido' }),
     comissao: z.number({ message: 'Informe um número' }).min(0, 'Mínimo 0%').max(100, 'Máximo 100%').optional(),
   })
-  .refine((m) => m.comissao === undefined || m.perfil === 'tecnico', {
-    message: 'Comissão só vale para técnico',
+  .refine((m) => m.comissao === undefined || m.perfil === 'tecnico' || m.perfil === 'dono', {
+    message: 'Comissão não vale para atendente',
     path: ['comissao'],
   })
 

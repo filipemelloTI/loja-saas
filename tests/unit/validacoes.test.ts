@@ -25,8 +25,11 @@ describe('esquemaMembro', () => {
   it('aceita técnico com comissão', () => {
     expect(esquemaMembro.safeParse({ nome: 'Carlos', email: 'c@x.com', perfil: 'tecnico', comissao: 10 }).success).toBe(true)
   })
-  it('rejeita comissão para quem não é técnico', () => {
-    expect(esquemaMembro.safeParse({ nome: 'Ana', email: 'a@x.com', perfil: 'atendente', comissao: 10 }).success).toBe(false)
+  it('aceita comissão para dono', () => {
+    expect(esquemaMembro.safeParse({ nome: 'Zé', email: 'z@x.com', perfil: 'dono', comissao: 30 }).success).toBe(true)
+  })
+  it('rejeita comissão para atendente', () => {
+    expect(esquemaMembro.safeParse({ nome: 'Ana', email: 'a@x.com', perfil: 'atendente', comissao: 30 }).success).toBe(false)
   })
 })
 
