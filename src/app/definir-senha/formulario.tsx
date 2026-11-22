@@ -12,20 +12,24 @@ const MENSAGENS: Record<string, string> = {
 
 export function FormularioSenha({ erro }: { erro?: string }) {
   const [pronto, setPronto] = useState(false)
-  const [semSessao, setSemSessao] = useState(false)
+  const [linkInvalido, setLinkInvalido] = useState(false)
 
   useEffect(() => {
-    const supabase = criarClienteNavegador()
+    // Contrato: /definir-senha?token_hash=<hashed_token>&type=recovery (ver montarLinkDefinirSenha).
+    // Nunca aproveita sessão já existente: sem token válido, não mostra o formulário.
     async function preparar() {
-      // O link de recuperação traz ?token_hash=...&type=recovery ou tokens no hash da URL.
       const params = new URLSearchParams(window.location.search)
       const tokenHash = params.get('token_hash')
-      if (tokenHash) {
-        await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' })
+      if (!tokenHash || params.get('type') !== 'recovery') {
+        setLinkInvalido(true)
+        return
       }
-      const { data } = await supabase.auth.getSession()
-      if (data.session) setPronto(true)
-      else setSemSessao(true)
+      const { error } = await criarClienteNavegador().auth.verifyOtp({
+        token_hash: tokenHash,
+        type: 'recovery',
+      })
+      if (error) setLinkInvalido(true)
+      else setPronto(true)
     }
     preparar()
   }, [])
@@ -34,8 +38,8 @@ export function FormularioSenha({ erro }: { erro?: string }) {
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 p-6">
       <h1 className="text-2xl font-semibold">Definir senha</h1>
       {erro && MENSAGENS[erro] && <p role="alert" className="text-red-600">{MENSAGENS[erro]}</p>}
-      {semSessao && !erro && <p role="alert" className="text-red-600">{MENSAGENS.link}</p>}
-      {pronto && (
+      {linkInvalido && !erro && <p role="alert" className="text-red-600">{MENSAGENS.link}</p>}
+      {pronto && !linkInvalido && (
         <form action={definirSenha} className="flex flex-col gap-3">
           <label className="flex flex-col gap-1">
             Nova senha (mínimo 8 caracteres)
