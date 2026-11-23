@@ -11,6 +11,7 @@ const SECOES = [
   { href: '/configuracoes/garantia', titulo: 'Garantia', sobre: 'Prazos e condições que anulam a garantia.' },
   { href: '/configuracoes/checklist', titulo: 'Checklist de avarias', sobre: 'Itens conferidos ao receber o aparelho.' },
   { href: '/configuracoes/vendas-e-os', titulo: 'Vendas e OS', sobre: 'Numeração, taxa de avaliação, pagamentos e comissão.' },
+  { href: '/configuracoes/suporte', titulo: 'Acesso de suporte', sobre: 'Libere um acesso temporário e só leitura para o suporte ajudar.' },
 ]
 
 export default function PaginaConfiguracoes() {

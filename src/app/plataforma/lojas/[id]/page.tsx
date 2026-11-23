@@ -12,6 +12,7 @@ import { criarClienteServidor } from '@/lib/supabase/servidor'
 import type { Modulo } from '@/lib/tipos'
 import { FormularioLoja, LinkDono } from '../../componentes'
 import { carregarPlanos } from '../../dados'
+import { EntrarComoSuporte } from './suporte'
 
 export const metadata: Metadata = { title: 'Loja' }
 
@@ -43,6 +44,20 @@ async function Conteudo({ params }: { params: Promise<{ id: string }> }) {
   const [planos, dono] = await Promise.all([carregarPlanos(), donoDaLoja(criarClienteAdmin(), id)])
   const situacao = SITUACAO[loja.situacao as Situacao]
 
+  // Acesso de suporte vigente desta loja (o admin lê todos pela RLS; o mais recente vale).
+  const { data: suporte } = await supabase
+    .from('acessos_suporte')
+    .select('expira_em')
+    .eq('loja_id', id)
+    .gt('expira_em', new Date().toISOString())
+    .order('expira_em', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const suporteExpira = (suporte?.expira_em as string | undefined) ?? null
+  const suporteTexto = suporteExpira
+    ? new Date(suporteExpira).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })
+    : null
+
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
@@ -55,6 +70,9 @@ async function Conteudo({ params }: { params: Promise<{ id: string }> }) {
       />
       <Cartao titulo="Senha do Dono">
         <LinkDono lojaId={loja.id} dono={dono} />
+      </Cartao>
+      <Cartao titulo="Acesso de suporte">
+        <EntrarComoSuporte vigente={!!suporteExpira} expiraEmTexto={suporteTexto} />
       </Cartao>
     </>
   )

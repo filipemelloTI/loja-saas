@@ -402,3 +402,34 @@ export async function salvarConfigVendasOSCom(deps: Dependencias, dados: DadosVe
       .eq('loja_id', dono.lojaId),
   )
 }
+
+// Acesso de suporte ------------------------------------------------------
+
+/** Durações, em horas, que o Dono pode liberar para o suporte entrar. */
+export const HORAS_SUPORTE = [24, 72] as const
+export type HorasSuporte = (typeof HORAS_SUPORTE)[number]
+
+const MS_POR_HORA = 60 * 60 * 1000
+
+/**
+ * O Dono libera acesso de suporte à própria loja por um tempo limitado.
+ * A RLS só deixa o Dono ativo (não suporte) inserir para a própria loja; `concedido_por`
+ * vem do default `auth.uid()`. O mais recente vale: não é preciso apagar os antigos.
+ */
+export async function liberarSuporteCom(deps: Dependencias, horas: number): Promise<Resultado> {
+  if (!(HORAS_SUPORTE as readonly number[]).includes(horas)) return { ok: false, erro: 'Duração de suporte inválida' }
+  const dono = await deps.donoDaSessao()
+  if (!dono) return ACESSO_NEGADO
+  const expira = new Date(Date.now() + horas * MS_POR_HORA).toISOString()
+  return gravar(deps.supabase.from('acessos_suporte').insert({ loja_id: dono.lojaId, expira_em: expira }))
+}
+
+/** O Dono encerra o acesso de suporte vigente da própria loja: faz expirar agora. */
+export async function encerrarSuporteCom(deps: Dependencias): Promise<Resultado> {
+  const dono = await deps.donoDaSessao()
+  if (!dono) return ACESSO_NEGADO
+  const agora = new Date().toISOString()
+  return gravar(
+    deps.supabase.from('acessos_suporte').update({ expira_em: agora }).eq('loja_id', dono.lojaId).gt('expira_em', agora),
+  )
+}

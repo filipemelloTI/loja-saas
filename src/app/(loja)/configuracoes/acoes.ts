@@ -5,8 +5,10 @@ import {
   adicionarUsuarioCom,
   alternarServicoCom,
   atualizarUsuarioCom,
+  encerrarSuporteCom,
   enviarLogoCom,
   gerarLinkSenhaCom,
+  liberarSuporteCom,
   restaurarMensagemPadraoCom,
   salvarChecklistCom,
   salvarCondicoesCom,
@@ -110,4 +112,12 @@ export async function salvarChecklist(lista: ItemChecklist[]) {
 
 export async function salvarConfigVendasOS(dados: DadosVendasOS) {
   return atualizarTela(await salvarConfigVendasOSCom(await dependencias(), dados))
+}
+
+export async function liberarSuporte(horas: number) {
+  return atualizarTela(await liberarSuporteCom(await dependencias(), horas))
+}
+
+export async function encerrarSuporte() {
+  return atualizarTela(await encerrarSuporteCom(await dependencias()))
 }

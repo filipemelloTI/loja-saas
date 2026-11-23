@@ -1,5 +1,5 @@
 begin;
-select plan(21);
+select plan(26);
 
 -- Só nesta transação (rollback no fim): permite trocar de usuário
 -- estando já no papel authenticated.
@@ -127,16 +127,49 @@ select throws_ok(
   'P0001', 'A loja precisa de pelo menos um dono ativo',
   'Não desativa o único dono');
 
--- Admin em suporte: lê o custo como Dono, mas não escreve -----------------
-insert into acessos_suporte (loja_id, expira_em)
-values ((select id from ids where chave = 'loja'), now() + interval '24 hours');
+-- Loja B (superuser, fora da sessão): serve para provar que o suporte em A não vaza.
+select testes.sair();
+with l as (
+  insert into lojas (nome, plano_id, modulos)
+  select 'Loja B', id, '{servico}' from planos where nome = 'Teste Config'
+  returning id)
+insert into ids select 'loja_b', id from l;
+insert into servicos (loja_id, nome, preco)
+values ((select id from ids where chave = 'loja_b'), 'Serviço de B', 500);
 
+-- Dono de A libera o acesso de suporte pela própria sessão (RLS do Dono) ---
+select testes.entrar_como((select id from ids where chave = 'dono'));
+select lives_ok(
+  format($$insert into acessos_suporte (loja_id, expira_em)
+           values (%L, now() + interval '24 hours')$$,
+         (select id from ids where chave = 'loja')),
+  'Dono libera o acesso de suporte da sua loja');
+
+-- Admin em suporte: lê A como Dono (só leitura), não escreve, não enxerga B --
 select testes.entrar_como((select id from ids where chave = 'admin'));
 
-select isnt_empty('select * from servicos_custo', 'Admin em suporte lê servicos_custo');
+select isnt_empty('select * from servicos_custo', 'Admin em suporte lê servicos_custo de A');
+select is_empty(
+  'update servicos set preco = 1 returning id',
+  'Admin em suporte não altera servicos de A');
 select is_empty(
   'update servicos_custo set custo_peca_estimado = 1 returning servico_id',
-  'Admin em suporte não altera servicos_custo');
+  'Admin em suporte não altera servicos_custo de A');
+select is_empty(
+  format($$select * from servicos where loja_id = %L$$,
+         (select id from ids where chave = 'loja_b')),
+  'Admin em suporte em A não enxerga serviços de B');
+
+-- Dono encerra: faz expirar agora; o admin perde o acesso -----------------
+select testes.entrar_como((select id from ids where chave = 'dono'));
+select isnt_empty(
+  'update acessos_suporte set expira_em = now() returning id',
+  'Dono encerra o acesso de suporte (expira agora)');
+
+select testes.entrar_como((select id from ids where chave = 'admin'));
+select is_empty(
+  'select * from servicos_custo',
+  'Sem acesso vigente, o admin não lê mais servicos_custo de A');
 
 select * from finish();
 rollback;
