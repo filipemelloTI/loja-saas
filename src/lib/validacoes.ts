@@ -14,17 +14,23 @@ export const esquemaServico = z.object({
   garantiaDias: diasInteiro.optional(),
 })
 
+const perfil = z.enum(['dono', 'tecnico', 'atendente'], { message: 'Perfil inválido' })
+const comissao = z.number({ message: 'Informe um número' }).min(0, 'Mínimo 0%').max(100, 'Máximo 100%')
+const SEM_COMISSAO_ATENDENTE = { message: 'Comissão não vale para atendente', path: ['comissao'] }
+
 export const esquemaMembro = z
   .object({
     nome: z.string().trim().min(1, 'Informe o nome'),
     email,
-    perfil: z.enum(['dono', 'tecnico', 'atendente'], { message: 'Perfil inválido' }),
-    comissao: z.number({ message: 'Informe um número' }).min(0, 'Mínimo 0%').max(100, 'Máximo 100%').optional(),
+    perfil,
+    comissao: comissao.optional(),
   })
-  .refine((m) => m.comissao === undefined || m.perfil === 'tecnico' || m.perfil === 'dono', {
-    message: 'Comissão não vale para atendente',
-    path: ['comissao'],
-  })
+  .refine((m) => m.comissao === undefined || m.perfil === 'tecnico' || m.perfil === 'dono', SEM_COMISSAO_ATENDENTE)
+
+/** Edição de um membro já cadastrado: `comissao: null` remove a comissão. */
+export const esquemaEdicaoMembro = z
+  .object({ perfil, ativo: z.boolean(), comissao: comissao.nullable() })
+  .refine((m) => m.comissao === null || m.perfil !== 'atendente', SEM_COMISSAO_ATENDENTE)
 
 export const esquemaConfigLoja = z.object({
   cnpj: z.string().optional(),

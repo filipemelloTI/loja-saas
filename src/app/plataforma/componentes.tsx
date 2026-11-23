@@ -2,7 +2,9 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Suspense, useState, useTransition, type FormEvent, type ReactNode } from 'react'
+import { Suspense, useState, useTransition, type FormEvent } from 'react'
+import { CaixaLink } from '@/components/CaixaLink'
+import { Alerta, Aviso } from '@/components/ui/Avisos'
 import { Botao, classesBotao } from '@/components/ui/Botao'
 import { Campo } from '@/components/ui/Campo'
 import { Cartao } from '@/components/ui/Cartao'
@@ -59,22 +61,6 @@ function Nav({ rota }: { rota: string | null }) {
 }
 
 // Peças dos formulários -----------------------------------------------------
-
-function Alerta({ children }: { children: ReactNode }) {
-  return (
-    <p role="alert" className="rounded-lg bg-perigo-suave px-3 py-2 font-medium text-sobre-perigo-suave">
-      {children}
-    </p>
-  )
-}
-
-function Aviso({ children }: { children: ReactNode }) {
-  return (
-    <p role="status" className="rounded-lg bg-marca-suave px-3 py-2 font-medium text-marca-forte">
-      {children}
-    </p>
-  )
-}
 
 const CLASSE_SELECAO =
   'min-h-11 w-full rounded-lg border border-linha-forte bg-superficie px-3 text-base text-tinta'
@@ -150,41 +136,6 @@ function EscolhaModulos({
   )
 }
 
-/** Link de definir senha com botão Copiar, para mandar pelo WhatsApp. */
-function CaixaLink({ link }: { link: string }) {
-  const [copiado, setCopiado] = useState(false)
-  async function copiar() {
-    try {
-      await navigator.clipboard.writeText(link)
-      setCopiado(true)
-    } catch {
-      document.querySelector<HTMLInputElement>('#link-definir-senha')?.select()
-    }
-  }
-  return (
-    <div className="flex flex-col gap-2">
-      <label htmlFor="link-definir-senha" className="text-sm font-semibold text-tinta">
-        Link para definir senha
-      </label>
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <input
-          id="link-definir-senha"
-          readOnly
-          value={link}
-          onFocus={(e) => e.currentTarget.select()}
-          className="min-h-11 w-full min-w-0 rounded-lg border border-linha-forte bg-superficie-2 px-3 text-sm text-tinta"
-        />
-        <Botao onClick={copiar}>{copiado ? 'Copiado' : 'Copiar'}</Botao>
-      </div>
-      <p aria-live="polite" className="text-sm text-tinta-suave">
-        {copiado
-          ? 'Link copiado. Cole na conversa com o Dono no WhatsApp.'
-          : 'Mande este link para o Dono pelo WhatsApp. Ele vale por 1 hora e só funciona uma vez.'}
-      </p>
-    </div>
-  )
-}
-
 // Nova loja ----------------------------------------------------------------
 
 export function FormularioNovaLoja({ planos }: { planos: Plano[] }) {
@@ -208,7 +159,7 @@ export function FormularioNovaLoja({ planos }: { planos: Plano[] }) {
     return (
       <Cartao titulo={`Loja “${criada.nome}” criada`}>
         <div className="flex flex-col gap-4">
-          <CaixaLink link={criada.link} />
+          <CaixaLink link={criada.link} para="o Dono" />
           <div className="flex flex-wrap gap-2">
             <Link href="/plataforma" className={classesBotao('secundario')}>
               Ver lojas
@@ -375,7 +326,7 @@ export function LinkDono({ lojaId, dono }: { lojaId: string; dono: { nome: strin
       </p>
       {erro && <Alerta>{erro}</Alerta>}
       {link ? (
-        <CaixaLink link={link} />
+        <CaixaLink link={link} para="o Dono" />
       ) : (
         <div>
           <Botao variante="secundario" onClick={gerar} disabled={pendente}>
