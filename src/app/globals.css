@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+/*
+  Paleta "balcão": verde-petróleo de confiança, âmbar de sinal (o mesmo amarelo das
+  etiquetas de conserto) e cinzas levemente esverdeados. Tudo vem destes tokens;
+  componentes não usam cores soltas.
+*/
+:root {
+  --papel: #f3f5f4;          /* fundo da página */
+  --superficie: #ffffff;     /* cartões, topo, barra inferior */
+  --superficie-2: #e9edeb;   /* hover, linhas zebradas, campo desabilitado */
+  --tinta: #18211f;          /* texto principal (15:1 no papel) */
+  --tinta-suave: #52605c;    /* texto secundário (6:1 no branco) */
+  --linha: #d5dcd9;          /* bordas */
+  --linha-forte: #8a9894;    /* borda de campo (3:1 no branco) */
+  --marca: #0d6b5f;          /* ação principal (6,3:1 no branco) */
+  --marca-forte: #0a5249;    /* hover/pressionado */
+  --sobre-marca: #ffffff;
+  --marca-suave: #dcefeb;    /* fundo de item ativo, selo informativo */
+  --sinal: #f5b700;          /* âmbar: item ativo, faixa de suporte */
+  --sobre-sinal: #1d1600;
+  --sinal-suave: #fdf0c4;
+  --sobre-sinal-suave: #6b4e00;
+  --perigo: #b42318;
+  --perigo-suave: #fde4e1;
+  --sobre-perigo-suave: #8c1b12;
+  --trilho: #0f2e29;         /* barra lateral do computador */
+  --sobre-trilho: #d6e6e2;
+  --sobre-trilho-suave: #93aea8;
+  --trilho-ativo: #1a4740;
+  --foco: #0d6b5f;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --papel: #0e1513;
+    --superficie: #151e1c;
+    --superficie-2: #1d2926;
+    --tinta: #e5ecea;
+    --tinta-suave: #9eaca8;
+    --linha: #283532;
+    --linha-forte: #5f6f6b;
+    --marca: #40c2ab;
+    --marca-forte: #6fd6c4;
+    --sobre-marca: #052520;
+    --marca-suave: #123b35;
+    --sinal: #f5c542;
+    --sobre-sinal: #1d1600;
+    --sinal-suave: #3a2f0c;
+    --sobre-sinal-suave: #f5d77e;
+    --perigo: #f2786c;
+    --perigo-suave: #3d1714;
+    --sobre-perigo-suave: #f8b4ac;
+    --trilho: #0a1110;
+    --sobre-trilho: #d6e6e2;
+    --sobre-trilho-suave: #8aa39d;
+    --trilho-ativo: #16302b;
+    --foco: #40c2ab;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-papel: var(--papel);
+  --color-superficie: var(--superficie);
+  --color-superficie-2: var(--superficie-2);
+  --color-tinta: var(--tinta);
+  --color-tinta-suave: var(--tinta-suave);
+  --color-linha: var(--linha);
+  --color-linha-forte: var(--linha-forte);
+  --color-marca: var(--marca);
+  --color-marca-forte: var(--marca-forte);
+  --color-sobre-marca: var(--sobre-marca);
+  --color-marca-suave: var(--marca-suave);
+  --color-sinal: var(--sinal);
+  --color-sobre-sinal: var(--sobre-sinal);
+  --color-sinal-suave: var(--sinal-suave);
+  --color-sobre-sinal-suave: var(--sobre-sinal-suave);
+  --color-perigo: var(--perigo);
+  --color-perigo-suave: var(--perigo-suave);
+  --color-sobre-perigo-suave: var(--sobre-perigo-suave);
+  --color-trilho: var(--trilho);
+  --color-sobre-trilho: var(--sobre-trilho);
+  --color-sobre-trilho-suave: var(--sobre-trilho-suave);
+  --color-trilho-ativo: var(--trilho-ativo);
+  --color-foco: var(--foco);
+  --font-sans: var(--fonte-texto);
+  --font-titulo: var(--fonte-titulo);
+}
+
+body {
+  background: var(--papel);
+  color: var(--tinta);
+  font-family: var(--fonte-texto), system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Foco sempre visível no teclado, nunca no toque. */
+:focus-visible {
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
+}
+
+/* Números de dinheiro e quantidade alinham em coluna. */
+.numeros {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
