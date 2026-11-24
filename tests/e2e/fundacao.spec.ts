@@ -1,21 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { createClient } from '@supabase/supabase-js'
 import { ADMIN_EMAIL, ADMIN_SENHA, PLANO_E2E } from './global-setup'
-import { carregarEnvLocal, env } from './env'
-import { montarLinkDefinirSenha } from '../../src/lib/auth-links'
-
-carregarEnvLocal()
-
-/** Gera um link de definir senha fresco pela service role (mesmo contrato da app). */
-async function linkDefinirSenhaFresco(baseURL: string, email: string): Promise<string> {
-  const admin = createClient(env('NEXT_PUBLIC_SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), {
-    auth: { persistSession: false },
-  })
-  const { data, error } = await admin.auth.admin.generateLink({ type: 'recovery', email })
-  const token = data?.properties?.hashed_token
-  if (error || !token) throw new Error(`Não gerou link fresco: ${error?.message}`)
-  return montarLinkDefinirSenha(baseURL, token)
-}
 
 /**
  * Teste ponta a ponta da fundação, contra o Supabase local + `next dev`.
@@ -59,30 +43,18 @@ async function entrar(page: Page, email: string, senha: string) {
 }
 
 /**
- * Abre o link de definir senha, define a senha e espera cair no shell da loja.
- * O link do primeiro parâmetro é o da UI (prova que a tela gera um link que funciona).
- * Em dev, o React (Strict Mode) roda o efeito duas vezes e pode consumir o token de uso
- * único em corrida; se a tela não estabilizar, geramos um link fresco e tentamos de novo.
+ * Abre o link REAL gerado pela UI, define a senha e espera cair no shell da loja.
+ * Sem fallback: é o link da própria tela que precisa funcionar. O token é de uso único e
+ * o efeito de definir-senha tem trava para rodar o verifyOtp só uma vez (inclusive no
+ * Strict Mode de dev), então o formulário aparece e permanece.
  */
-async function definirSenhaPeloLink(page: Page, baseURL: string, email: string, linkUI: string, senha: string) {
+async function definirSenhaPeloLink(page: Page, linkUI: string, senha: string) {
   const campoSenha = page.getByLabel('Nova senha (mínimo 8 caracteres)')
-
-  async function tentar(link: string): Promise<boolean> {
-    await page.goto(link)
-    // O formulário só aparece (e permanece) depois do verifyOtp (estado "pronto").
-    try {
-      await expect(campoSenha).toBeVisible({ timeout: 10_000 })
-      await page.waitForTimeout(500) // deixa o 2º efeito do Strict Mode passar
-      await expect(campoSenha).toBeVisible({ timeout: 2_000 })
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  if (!(await tentar(linkUI))) {
-    expect(await tentar(await linkDefinirSenhaFresco(baseURL, email)), 'formulário de senha visível').toBe(true)
-  }
+  await page.goto(linkUI)
+  // O formulário só aparece (e permanece) depois do verifyOtp (estado "pronto").
+  await expect(campoSenha).toBeVisible()
+  await page.waitForTimeout(500) // confirma que o 2º efeito do Strict Mode não derruba o form
+  await expect(campoSenha).toBeVisible()
 
   await campoSenha.fill(senha)
   await page.getByLabel('Repita a senha').fill(senha)
@@ -91,8 +63,7 @@ async function definirSenhaPeloLink(page: Page, baseURL: string, email: string, 
   await expect(page).not.toHaveURL(/\/definir-senha/)
 }
 
-test('fundação ponta a ponta: loja, senha, módulos e perfis', async ({ page, baseURL }) => {
-  const base = baseURL!
+test('fundação ponta a ponta: loja, senha, módulos e perfis', async ({ page }) => {
   const nomeLoja = `Loja E2E ${run}`
   let linkDono = ''
   let urlLoja = ''
@@ -122,7 +93,7 @@ test('fundação ponta a ponta: loja, senha, módulos e perfis', async ({ page, 
   })
 
   await test.step('Dono define a senha e vê "Configurações" no menu', async () => {
-    await definirSenhaPeloLink(page, base, emailDono, linkDono, SENHA)
+    await definirSenhaPeloLink(page, linkDono, SENHA)
     await expect(menuLateral(page).getByRole('link', { name: 'Configurações' })).toBeVisible()
     // Com todos os módulos, Fornecedores aparece neste momento.
     await expect(menuLateral(page).getByRole('link', { name: 'Fornecedores' })).toBeVisible()
@@ -160,7 +131,7 @@ test('fundação ponta a ponta: loja, senha, módulos e perfis', async ({ page, 
     const linkTecnico = await page.getByLabel('Link para definir senha').inputValue()
     expect(linkTecnico).toContain('/definir-senha?token_hash=')
 
-    await definirSenhaPeloLink(page, base, emailTecnico, linkTecnico, SENHA)
+    await definirSenhaPeloLink(page, linkTecnico, SENHA)
 
     // Menu do técnico é exatamente Início, Serviço, Clientes, Estoque.
     await expect(menuLateral(page).getByRole('link')).toHaveText(['Início', 'Serviço', 'Clientes', 'Estoque'])

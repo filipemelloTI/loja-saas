@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { criarClienteNavegador } from '@/lib/supabase/navegador'
 import { definirSenha } from '@/lib/auth-acoes'
 
@@ -13,8 +13,14 @@ const MENSAGENS: Record<string, string> = {
 export function FormularioSenha({ erro }: { erro?: string }) {
   const [pronto, setPronto] = useState(false)
   const [linkInvalido, setLinkInvalido] = useState(false)
+  // verifyOtp consome o token de uso único: precisa rodar UMA vez. Em dev o Strict Mode
+  // invoca o efeito duas vezes; sem esta trava a 2ª chamada falha ("link inválido") por
+  // tentar reusar o token já gasto. O ref persiste entre as duas invocações.
+  const jaPreparou = useRef(false)
 
   useEffect(() => {
+    if (jaPreparou.current) return
+    jaPreparou.current = true
     // Contrato: /definir-senha?token_hash=<hashed_token>&type=recovery (ver montarLinkDefinirSenha).
     // Nunca aproveita sessão já existente: sem token válido, não mostra o formulário.
     async function preparar() {

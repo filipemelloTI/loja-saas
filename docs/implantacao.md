@@ -24,7 +24,9 @@ digita senha e não publica no seu lugar — ele te guia. Faça nesta ordem:
    iguais ao domínio do Netlify, e **desligar o cadastro público** (só convite via admin).
 6. Criar o **admin da plataforma em produção**: seu usuário no Supabase Auth + uma linha em
    `admins_plataforma` (SQL no painel).
-7. Entrar no site publicado, **criar a loja do cunhado** (plano Completo), gerar o link do
+7. Criar o **plano Completo** em produção (SQL no painel) — sem ele o seletor de plano fica
+   vazio e não dá para criar loja.
+8. Entrar no site publicado, **criar a loja do cunhado** (plano Completo), gerar o link do
    Dono e **conferir o login no celular** dele.
 
 O detalhe de cada passo está abaixo. Onde aparecer **[conta sua]**, é um passo que só você
@@ -66,7 +68,7 @@ npx supabase db push        # aplica todas as migrações em supabase/migrations
 
 O `<ref-do-projeto>` é o pedaço do Project URL (`https://<ref>.supabase.co`).
 O `db push` **não** roda o `seed.sql` (ele é só para desenvolvimento local): em produção
-os dados — admin, planos, lojas — são criados pelos passos 6 e 7.
+os dados — admin, planos, lojas — são criados pelos passos 6, 7 e 8.
 
 ### 4. Variáveis de ambiente no Netlify — [conta sua]
 
@@ -110,7 +112,21 @@ Em **Authentication → Providers → Email** (ou *Sign In / Up*):
 3. Entre no site publicado com esse e-mail/senha. Você deve cair direto em **/plataforma**
    (o painel). Se cair em outra tela, confira se o UUID da linha bate com o do usuário.
 
-### 7. Loja do cunhado — [conta sua]
+### 7. Plano Completo em produção — [conta sua]
+
+O `db push` **não** roda o `seed.sql`, então em produção a tabela `planos` nasce vazia e o
+seletor de plano da tela "Nova loja" fica sem opção. Crie o plano Completo uma vez, no
+**SQL Editor** do Supabase:
+
+```sql
+insert into public.planos (nome, modulos, limite_usuarios)
+values ('Completo', '{servico,estoque,vendas,fornecedores,financeiro}', 5);
+```
+
+Pode criar outros planos depois pela própria tela (**Planos**, no painel) ou repetindo o
+`insert` com outro nome/limite/módulos.
+
+### 8. Loja do cunhado — [conta sua]
 
 1. No painel, **Nova loja**: nome da loja, plano **Completo**, nome e e-mail do Dono (o
    cunhado). Confirme os módulos (o plano Completo já marca todos).
@@ -144,7 +160,7 @@ Tudo que mordeu durante a montagem. Formato do projeto: **sintoma → causa → 
 |---|---|---|
 | Depois de `supabase db reset` os usuários somem e só sobra o admin | O `reset` recria o banco e roda **só** `seed.sql`; usuários criados à mão pela tela se perdem | Em dev, contar só com o que está no `seed.sql` (`admin@local.test` / `admin123`). Os testes e2e **semeiam o que precisam** pela service role (`tests/e2e/global-setup.ts`), não dependem de usuário criado à mão |
 | `supabase link` / `db push` pede chave e a antiga não serve | O **CLI 3.x** mudou: autentica por `supabase login` (access token) e o `link` pede a **senha do banco**, não a chave da API | `npx supabase login` primeiro; no `link`, usar a **senha do banco** definida ao criar o projeto. As chaves `anon`/`service_role` são só para a aplicação (variáveis do Netlify), não para o `link` |
-| `db push` não cria admin/planos na nuvem | O `seed.sql` é marcado como dados de **desenvolvimento** e não roda em produção | Criar admin e planos em produção pelos passos 6 e 7 (SQL + painel) |
+| Em produção o seletor de plano em "Nova loja" nasce **vazio** e não dá para criar loja | O único `insert into planos` fora dos testes está no `seed.sql`, que **não** roda no `db push` | Criar o plano Completo por SQL no painel (passo 7) antes de criar a loja; admin e lojas também são criados à mão (passos 6 e 8), não automaticamente |
 
 ### UI / navegador
 

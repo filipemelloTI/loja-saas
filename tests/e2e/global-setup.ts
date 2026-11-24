@@ -11,9 +11,29 @@ export const ADMIN_EMAIL = 'admin@local.test'
 export const ADMIN_SENHA = 'admin123'
 export const PLANO_E2E = 'E2E Completo'
 
+/** Só roda contra Supabase local (127.0.0.1 ou localhost). Evita criar um admin de senha
+ *  conhecida (admin@local.test / admin123) e um plano de teste num projeto de produção. */
+function exigirSupabaseLocal(url: string): void {
+  let host: string
+  try {
+    host = new URL(url).hostname
+  } catch {
+    throw new Error(`NEXT_PUBLIC_SUPABASE_URL inválida: ${url}`)
+  }
+  if (host !== '127.0.0.1' && host !== 'localhost') {
+    throw new Error(
+      `E2E abortado: NEXT_PUBLIC_SUPABASE_URL aponta para "${host}", não para o Supabase local ` +
+        `(127.0.0.1 ou localhost). O globalSetup cria admin@local.test com senha conhecida e um ` +
+        `plano de teste — isso nunca pode rodar contra produção. Ajuste o .env.local.`,
+    )
+  }
+}
+
 async function globalSetup() {
   carregarEnvLocal()
-  const admin = createClient(env('NEXT_PUBLIC_SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), {
+  const url = env('NEXT_PUBLIC_SUPABASE_URL')
+  exigirSupabaseLocal(url)
+  const admin = createClient(url, env('SUPABASE_SERVICE_ROLE_KEY'), {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
