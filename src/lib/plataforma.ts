@@ -18,6 +18,8 @@ export type Dependencias = {
   admin: SupabaseClient
   /** Origem do site para montar o link de definir senha. */
   origem: () => Promise<string>
+  /** Loja que o admin atende agora em suporte (ou null), lida com o cliente da sessão (RLS). */
+  lojaEmSuporte: () => Promise<string | null>
 }
 
 export type Resultado = { ok: true } | { ok: false; erro: string }
@@ -119,6 +121,11 @@ export async function atualizarLojaCom(deps: Dependencias, id: string, dados: Da
   if (!modulos.ok) return modulos
   if (!SITUACOES.includes(dados.situacao)) return { ok: false, erro: 'Situação inválida' }
   if (!(await deps.souAdmin())) return ACESSO_NEGADO
+  // O banco deixa plano/módulos/situação só leitura enquanto há suporte aberto nesta loja
+  // (`lojas_admin_atualiza` exclui `loja_em_suporte()`). A service role passaria por cima,
+  // então barramos aqui também: com suporte vigente desta loja, nada é gravado.
+  if ((await deps.lojaEmSuporte()) === id)
+    return { ok: false, erro: 'Encerre o modo suporte desta loja antes de alterar plano, módulos ou situação.' }
 
   const { error } = await deps.admin
     .from('lojas')

@@ -27,6 +27,11 @@ function dependencias(): Dependencias {
     },
     admin: criarClienteAdmin(),
     origem: origemDoSite,
+    lojaEmSuporte: async () => {
+      const supabase = await criarClienteServidor()
+      const { data } = await supabase.rpc('loja_em_suporte')
+      return (data as string | null) ?? null
+    },
   }
 }
 

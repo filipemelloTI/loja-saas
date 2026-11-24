@@ -23,11 +23,12 @@ function clienteFalso(respostas: Partial<Record<string, Resposta[]>> = {}, auth:
   return cliente
 }
 
-function deps(cliente = clienteFalso(), admin = true) {
+function deps(cliente = clienteFalso(), admin = true, emSuporte: string | null = null) {
   const d: Dependencias = {
     souAdmin: vi.fn(async () => admin),
     admin: cliente as unknown as SupabaseClient,
     origem: vi.fn(async () => 'http://localhost:3000'),
+    lojaEmSuporte: vi.fn(async () => emSuporte),
   }
   return d
 }
@@ -166,6 +167,30 @@ describe('atualizarLoja', () => {
     const r = await atualizarLojaCom(deps(cliente, false), 'L1', { planoId: 'p1', modulos: ['servico'], situacao: 'suspensa' })
     expect(r).toEqual({ ok: false, erro: 'Acesso negado' })
     expect(cliente.from).not.toHaveBeenCalled()
+  })
+
+  it('admin em suporte desta loja: recusado e nada é gravado', async () => {
+    const cliente = clienteFalso()
+    const r = await atualizarLojaCom(deps(cliente, true, 'L1'), 'L1', { planoId: 'p1', modulos: ['servico'], situacao: 'em_dia' })
+    expect(r).toEqual({
+      ok: false,
+      erro: 'Encerre o modo suporte desta loja antes de alterar plano, módulos ou situação.',
+    })
+    expect(cliente.from).not.toHaveBeenCalled()
+  })
+
+  it('admin em suporte de outra loja: grava normalmente', async () => {
+    const cliente = clienteFalso()
+    const r = await atualizarLojaCom(deps(cliente, true, 'L2'), 'L1', { planoId: 'p1', modulos: ['servico'], situacao: 'em_dia' })
+    expect(r).toEqual({ ok: true })
+    expect(cliente.from).toHaveBeenCalledWith('lojas')
+  })
+
+  it('sem suporte aberto: grava normalmente', async () => {
+    const cliente = clienteFalso()
+    const r = await atualizarLojaCom(deps(cliente), 'L1', { planoId: 'p1', modulos: ['servico'], situacao: 'em_dia' })
+    expect(r).toEqual({ ok: true })
+    expect(cliente.from).toHaveBeenCalledWith('lojas')
   })
 })
 
