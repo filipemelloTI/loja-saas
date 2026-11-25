@@ -63,3 +63,57 @@ export const esquemaNovaLoja = z
     const r = validarModulos(v.modulos as Modulo[])
     if (!r.ok) ctx.addIssue({ code: 'custom', message: r.erro, path: ['modulos'] })
   })
+
+/** Confere os dois dígitos verificadores; aceita com ou sem máscara. */
+export function cpfValido(cpf: string): boolean {
+  const d = cpf.replace(/\D/g, '')
+  if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false
+  const digito = (n: number) => {
+    let soma = 0
+    for (let i = 0; i < n; i++) soma += Number(d[i]) * (n + 1 - i)
+    const resto = (soma * 10) % 11
+    return resto === 10 ? 0 : resto
+  }
+  return digito(9) === Number(d[9]) && digito(10) === Number(d[10])
+}
+
+export const esquemaCliente = z.object({
+  nome: z.string().trim().min(1, 'Informe o nome'),
+  telefone: z.string().trim().min(1, 'Informe o telefone'),
+  cpf: z.string().refine(cpfValido, 'CPF inválido').optional(),
+  email: email.optional(),
+  endereco: z.string().optional(),
+  nascimento: z.iso.date('Data inválida').optional(),
+})
+
+/** Mesmos valores do enum `public.tipo_aparelho` no banco (`relogio` sem acento). */
+const aparelhoTipo = z.enum(['celular', 'tablet', 'relogio', 'notebook', 'outro'], { message: 'Escolha o tipo do aparelho' })
+
+export const esquemaNovaOS = z
+  .object({
+    interna: z.boolean(),
+    clienteId: z.string().optional(),
+    aparelhoTipo,
+    marca: z.string().optional(),
+    modelo: z.string().optional(),
+    cor: z.string().optional(),
+    imei: z.string().optional(),
+    defeitoRelatado: z.string().trim().min(1, 'Descreva o defeito'),
+    acessorios: z.array(z.string()).optional(),
+    checklist: z
+      .array(z.object({ nome: z.string(), marcado: z.boolean(), observacao: z.string().optional() }))
+      .optional(),
+    observacao: z.string().optional(),
+    tecnicoId: z.string().optional(),
+    previsaoEntrega: z.iso.date('Data inválida').optional(),
+    senhaAparelho: z.string().optional(),
+  })
+  .superRefine((v, ctx) => {
+    const temCliente = !!v.clienteId
+    if (!v.interna && !temCliente) ctx.addIssue({ code: 'custom', message: 'Escolha o cliente', path: ['clienteId'] })
+    if (v.interna && temCliente) ctx.addIssue({ code: 'custom', message: 'OS interna não tem cliente', path: ['clienteId'] })
+  })
+
+export const esquemaLaudo = z.object({
+  laudo: z.string().trim().min(1, 'Escreva o laudo'),
+})
