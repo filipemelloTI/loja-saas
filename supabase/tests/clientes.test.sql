@@ -1,5 +1,5 @@
 begin;
-select plan(13);
+select plan(15);
 
 -- Só nesta transação (rollback no fim): permite trocar de usuário
 -- estando já no papel authenticated.
@@ -61,6 +61,11 @@ select testes.entrar_como((select id from ids where chave = 'tecnico_a'));
 select is((select count(*) from clientes), 1::bigint,
   'Técnico A lê o cliente da loja');
 
+select results_eq(
+  $$update clientes set telefone = '11888880000' returning telefone$$,
+  array['11888880000'],
+  'Técnico A atualiza o cliente da loja');
+
 -- Dono A ----------------------------------------------------------------
 select testes.entrar_como((select id from ids where chave = 'dono_a'));
 
@@ -89,6 +94,13 @@ select throws_ok(
          (select id from ids where chave = 'loja_a')),
   '42501', null,
   'Dono B não insere cliente na loja A');
+
+-- Com privilégio total: nada da loja A foi alterado nem apagado por B.
+select testes.sair();
+select is(
+  (select nome from clientes where loja_id = (select id from ids where chave = 'loja_a')),
+  'Maria C.',
+  'Cliente da loja A segue intacto após as tentativas do Dono B');
 
 -- Admin suspende a loja A -----------------------------------------------
 select testes.entrar_como((select id from ids where chave = 'admin'));
