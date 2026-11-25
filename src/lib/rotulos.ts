@@ -27,6 +27,15 @@ export function listarModulos(modulos: Modulo[]): string {
 
 export const ROTULO_PERFIL: Record<Perfil, string> = { dono: 'Dono', tecnico: 'Técnico', atendente: 'Atendente' }
 
+/** Valores do enum `public.tipo_aparelho` do banco. */
+export const ROTULO_APARELHO: Record<string, string> = {
+  celular: 'Celular',
+  tablet: 'Tablet',
+  relogio: 'Relógio',
+  notebook: 'Notebook',
+  outro: 'Outro',
+}
+
 /** Formas de pagamento que a loja pode aceitar (valores gravados em `config_loja.formas_pagamento`). */
 export const FORMAS_PAGAMENTO = {
   pix: 'Pix',

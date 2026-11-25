@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { montarLinkDefinirSenha } from '@/lib/auth-links'
 import { MENSAGEM_PADRAO, eventoValido } from '@/lib/mensagens'
+import { FALHA_SALVAR, erroDoBanco, primeiroErro, type Resultado } from '@/lib/resultado'
 import { FORMAS_PAGAMENTO } from '@/lib/rotulos'
 import { esquemaConfigLoja, esquemaEdicaoMembro, esquemaMembro, esquemaServico } from '@/lib/validacoes'
 
@@ -23,22 +24,14 @@ export type Dependencias = {
   origem: () => Promise<string>
 }
 
-export type Resultado = { ok: true } | { ok: false; erro: string }
 export type ResultadoLink = { ok: true; linkDefinirSenha: string } | { ok: false; erro: string }
 
-export const FALHA_SALVAR = 'Não foi possível salvar. Tente de novo.'
+// Vivem em `resultado.ts` (compartilhados entre módulos); reexportados para quem já importa daqui.
+export { FALHA_SALVAR, erroDoBanco, type Resultado }
+
 const ACESSO_NEGADO = { ok: false, erro: 'Acesso negado' } as const
 const NAO_ENCONTRADO = { ok: false, erro: 'Usuário não encontrado' } as const
 const OK = { ok: true } as const
-
-/** Erro do banco para a tela: os triggers (P0001) já falam português; o resto vira mensagem genérica. */
-export function erroDoBanco(erro: { code?: string; message: string }): { ok: false; erro: string } {
-  return { ok: false, erro: erro.code === 'P0001' ? erro.message : FALHA_SALVAR }
-}
-
-function primeiroErro(e: z.ZodError) {
-  return e.issues[0]?.message ?? 'Dados inválidos'
-}
 
 /** Grava e devolve o resultado: erro do banco mapeado ou ok. */
 async function gravar(consulta: PromiseLike<{ error: { code?: string; message: string } | null }>): Promise<Resultado> {
