@@ -1,5 +1,5 @@
 begin;
-select plan(46);
+select plan(52);
 
 grant usage on schema testes to authenticated;
 grant execute on function testes.entrar_como(uuid), testes.sair() to authenticated;
@@ -231,6 +231,9 @@ values ((select id from ids where chave = 'loja_a'), now() + interval '24 hours'
 
 select testes.entrar_como((select id from ids where chave = 'admin'));
 select is(
+  public.em_suporte() and public.minha_loja() = (select id from ids where chave = 'loja_a'),
+  true, 'Controle: o admin está de fato em suporte na loja A (o null abaixo vem da regra, não da falta de vínculo)');
+select is(
   public.senha_aparelho((select id from ids where chave = 'os_a1')),
   null, 'Admin em suporte recebe null: suporte não enxerga segredo de cliente');
 select throws_ok(
@@ -248,6 +251,25 @@ select testes.entrar_como((select id from ids where chave = 'dono_b'));
 select is(
   public.senha_aparelho((select id from ids where chave = 'os_b1')),
   'S3nh@-Loja-B', 'Senha da B1 intacta');
+
+-- Loja suspensa: nem lê nem grava -------------------------------------------
+select testes.sair();
+update lojas set situacao = 'suspensa' where id = (select id from ids where chave = 'loja_a');
+select testes.entrar_como((select id from ids where chave = 'dono_a'));
+select is(
+  public.senha_aparelho((select id from ids where chave = 'os_a1')),
+  null, 'Dono de loja suspensa recebe null');
+select throws_ok(
+  format($$select public.guardar_senha_aparelho(%L, 'Suspensa')$$,
+         (select id from ids where chave = 'os_a1')),
+  '42501', 'sem permissão para guardar a senha',
+  'Dono de loja suspensa não grava senha');
+select testes.sair();
+update lojas set situacao = 'em_dia' where id = (select id from ids where chave = 'loja_a');
+select testes.entrar_como((select id from ids where chave = 'dono_a'));
+select is(
+  public.senha_aparelho((select id from ids where chave = 'os_a1')),
+  'S3nh@-Do-Balcao', 'Reativada a loja, a senha da A1 segue intacta (a suspensão era o único bloqueio)');
 
 -- Efêmera: some quando a OS é encerrada ----------------------------------
 select testes.sair();
@@ -302,6 +324,27 @@ select is(
   (select count(*) from public.os_senha_aparelho
    where os_id = (select id from ids where chave = 'os_a2')),
   0::bigint, 'A tentativa em OS encerrada não recriou a linha');
+
+-- O carimbo do primeiro encerramento não se move ----------------------------
+-- now() é fixo dentro da transação de teste; por isso o carimbo é recuado
+-- para uma data antiga antes de repetir o status terminal.
+select testes.sair();
+update ordens_servico set encerrada_em = '2020-01-01 00:00:00+00'
+where id = (select id from ids where chave = 'os_a2');
+select testes.entrar_como((select id from ids where chave = 'dono_a'));
+update ordens_servico set status = 'entregue'
+where id = (select id from ids where chave = 'os_a2');
+select testes.sair();
+select is(
+  (select encerrada_em from ordens_servico where id = (select id from ids where chave = 'os_a2')),
+  '2020-01-01 00:00:00+00'::timestamptz, 'entregue -> entregue não re-carimba encerrada_em');
+select testes.entrar_como((select id from ids where chave = 'dono_a'));
+update ordens_servico set status = 'devolvido'
+where id = (select id from ids where chave = 'os_a2');
+select testes.sair();
+select is(
+  (select encerrada_em from ordens_servico where id = (select id from ids where chave = 'os_a2')),
+  '2020-01-01 00:00:00+00'::timestamptz, 'entregue -> devolvido não re-carimba encerrada_em');
 
 select * from finish();
 rollback;
