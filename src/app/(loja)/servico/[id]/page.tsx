@@ -6,7 +6,7 @@ import { AreaProtegida } from '@/components/AreaProtegida'
 import { Roda } from '@/components/ui/Botao'
 import { Cartao } from '@/components/ui/Cartao'
 import { Selo } from '@/components/ui/Selo'
-import { formatarData, formatarDataISO } from '@/lib/formatar'
+import { formatarData, formatarDataHora, formatarDataISO } from '@/lib/formatar'
 import { perfilEfetivo } from '@/lib/guarda'
 import { avancosDe, ehTerminal, podeMudar, ROTULO_STATUS, type StatusOS } from '@/lib/os-status'
 import { ROTULO_APARELHO } from '@/lib/rotulos'
@@ -14,7 +14,7 @@ import { contextoAtual } from '@/lib/sessao'
 import { FormularioLaudo } from '../_componentes/formulario'
 import { SenhaDoAparelho } from '../_componentes/senha'
 import { AcoesStatus } from '../_componentes/status'
-import { carregarOS, listarTecnicos } from '../dados'
+import { carregarOS, nomeDoTecnicoDaOS } from '../dados'
 
 export const metadata: Metadata = { title: 'Ordem de serviço' }
 
@@ -41,7 +41,7 @@ export default function PaginaOS({ params }: PageProps<'/servico/[id]'>) {
 
 async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params'] }) {
   const { id } = await params
-  const [{ os, somenteLeitura }, tecnicos, ctx] = await Promise.all([carregarOS(id), listarTecnicos(), contextoAtual()])
+  const [{ os, somenteLeitura }, ctx] = await Promise.all([carregarOS(id), contextoAtual()])
   if (!os) notFound()
 
   const perfil = ctx ? perfilEfetivo(ctx) : null
@@ -52,9 +52,10 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
   const voltas = (Object.keys(ROTULO_STATUS) as StatusOS[]).filter(
     (s) => s !== os.status && !avancos.includes(s) && perfil !== null && podeMudar(os.status, s, perfil).ok,
   )
-  const tecnico = os.tecnicoId ? tecnicos.find((t) => t.id === os.tecnicoId)?.nome : null
+  // Lido direto pelo id: quem já saiu da equipe continua no registro da OS.
+  const tecnico = await nomeDoTecnicoDaOS(os.tecnicoId)
   // O valor da senha nunca entra aqui: só se existe uma que esta pessoa pode ver. Ela é buscada ao tocar no botão.
-  const haSenhaParaMostrar = os.senhaAparelho !== null && !somenteLeitura
+  const haSenhaParaMostrar = !!os.senhaAparelho && !somenteLeitura
 
   const aparelho = [ROTULO_APARELHO[os.aparelhoTipo] ?? 'Aparelho', os.marca, os.modelo].filter(Boolean).join(' · ')
   const dados: [string, ReactNode][] = [
@@ -130,11 +131,12 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
       </Cartao>
 
       <Cartao titulo="Laudo">
-        <FormularioLaudo osId={os.id} laudo={os.laudo} somenteLeitura={somenteLeitura} />
+        {terminal && <p className="mb-3 text-tinta-suave">OS encerrada: o laudo não pode mais ser alterado.</p>}
+        <FormularioLaudo osId={os.id} laudo={os.laudo} somenteLeitura={somenteLeitura || terminal} />
       </Cartao>
 
       {haSenhaParaMostrar && (
-        <Cartao etiqueta="Só você vê" titulo="Senha do aparelho">
+        <Cartao etiqueta="Só você vê" titulo="Senha do aparelho" className="print:hidden">
           <SenhaDoAparelho osId={os.id} />
         </Cartao>
       )}
@@ -156,7 +158,7 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
                 )}
               </div>
               <p className="text-sm text-tinta-suave">
-                <span className="numeros">{formatarData(h.criadoEm)}</span> · {h.membroNome}
+                <span className="numeros">{formatarDataHora(h.criadoEm)}</span> · {h.membroNome}
               </p>
               {h.observacao && <p className="whitespace-pre-wrap text-tinta">{h.observacao}</p>}
             </li>

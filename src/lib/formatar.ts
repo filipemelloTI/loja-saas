@@ -32,3 +32,20 @@ export function formatarData(instante: string): string {
   const d = new Date(instante)
   return Number.isNaN(d.getTime()) ? instante : dataDaLoja.format(d)
 }
+
+const dataHoraDaLoja = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: 'America/Sao_Paulo',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+})
+
+/** Instante gravado no banco → `25/11/2026 14:32`, no horário de Brasília. */
+export function formatarDataHora(instante: string): string {
+  const d = new Date(instante)
+  if (Number.isNaN(d.getTime())) return instante
+  return dataHoraDaLoja.format(d).replace(', ', ' ')
+}

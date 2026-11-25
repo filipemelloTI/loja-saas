@@ -44,3 +44,14 @@ export async function listarTecnicos(): Promise<Tecnico[]> {
     .order('nome')
   return ((data ?? []) as Tecnico[]).map(({ id, nome }) => ({ id, nome }))
 }
+
+/**
+ * Nome de quem está na OS como técnico, mesmo que hoje esteja inativo ou tenha mudado de perfil: a OS é
+ * registro histórico. `null` quando a OS não tem técnico; "Técnico (inativo)" quando não dá mais para ler o nome.
+ */
+export async function nomeDoTecnicoDaOS(tecnicoId: string | null): Promise<string | null> {
+  if (!tecnicoId) return null
+  const { supabase } = await base()
+  const { data } = await supabase.from('membros').select('nome').eq('id', tecnicoId).maybeSingle()
+  return (data?.nome as string | undefined) || 'Técnico (inativo)'
+}

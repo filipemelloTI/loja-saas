@@ -142,6 +142,17 @@ export async function salvarLaudoCom(deps: Dependencias, osId: string, laudo: st
   const membro = await deps.membroDaSessao()
   if (!membro) return ACESSO_NEGADO
 
+  // OS encerrada é registro fechado: o laudo não muda mais, e a conferência é daqui, não só da tela.
+  const { data: atual, error: falhaLeitura } = await deps.supabase
+    .from('ordens_servico')
+    .select('status')
+    .eq('id', osId)
+    .eq('loja_id', membro.lojaId)
+    .maybeSingle()
+  if (falhaLeitura) return erroDoBanco(falhaLeitura)
+  if (!atual) return NAO_ENCONTRADA
+  if (ehTerminal(atual.status as StatusOS)) return { ok: false, erro: 'A OS já foi encerrada.' }
+
   const { data, error } = await deps.supabase
     .from('ordens_servico')
     .update({ laudo: lido.data.laudo })

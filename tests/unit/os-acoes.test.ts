@@ -288,6 +288,8 @@ describe('mudarStatus', () => {
 })
 
 describe('salvarLaudo', () => {
+  const aberta: Resposta = { data: { status: 'em_servico' }, error: null }
+
   it('laudo em branco para antes de tocar o banco', async () => {
     const supabase = clienteFalso()
     const d = deps({ supabase })
@@ -306,23 +308,37 @@ describe('salvarLaudo', () => {
   })
 
   it('grava o laudo aparado, limitado à loja da sessão', async () => {
-    const supabase = clienteFalso({ ordens_servico: [{ data: { id: 'OS1' }, error: null }] })
+    const supabase = clienteFalso({ ordens_servico: [aberta, { data: { id: 'OS1' }, error: null }] })
     const r = await salvarLaudoCom(deps({ supabase }), 'OS1', '  Placa queimada  ')
     expect(r).toEqual({ ok: true })
-    const [c] = cadeias(supabase, 'ordens_servico')
+    const c = cadeias(supabase, 'ordens_servico')[1]
     expect(c.update).toHaveBeenCalledWith({ laudo: 'Placa queimada' })
     expect(c.eq).toHaveBeenCalledWith('id', 'OS1')
     expect(c.eq).toHaveBeenCalledWith('loja_id', 'L1')
   })
 
   it('OS de outra loja: não encontrada', async () => {
-    const supabase = clienteFalso({ ordens_servico: [{ data: null, error: null }] })
+    const supabase = clienteFalso({ ordens_servico: [aberta, { data: null, error: null }] })
     expect(await salvarLaudoCom(deps({ supabase }), 'OS1', 'x')).toEqual({ ok: false, erro: 'OS não encontrada' })
   })
 
   it('erro do banco vira mensagem genérica', async () => {
-    const supabase = clienteFalso({ ordens_servico: [{ data: null, error: { message: 'boom', code: 'XX000' } }] })
+    const supabase = clienteFalso({ ordens_servico: [aberta, { data: null, error: { message: 'boom', code: 'XX000' } }] })
     expect(await salvarLaudoCom(deps({ supabase }), 'OS1', 'x')).toEqual({ ok: false, erro: FALHA_SALVAR })
+  })
+
+  it('OS encerrada: recusa e nunca chama update', async () => {
+    for (const status of ['entregue', 'devolvido']) {
+      const supabase = clienteFalso({ ordens_servico: [{ data: { status }, error: null }] })
+      expect(await salvarLaudoCom(deps({ supabase }), 'OS1', 'x')).toEqual({ ok: false, erro: 'A OS já foi encerrada.' })
+      for (const c of cadeias(supabase, 'ordens_servico')) expect(c.update).not.toHaveBeenCalled()
+    }
+  })
+
+  it('OS inexistente na leitura do status: não encontrada, sem gravar', async () => {
+    const supabase = clienteFalso({ ordens_servico: [{ data: null, error: null }] })
+    expect(await salvarLaudoCom(deps({ supabase }), 'OS1', 'x')).toEqual({ ok: false, erro: 'OS não encontrada' })
+    for (const c of cadeias(supabase, 'ordens_servico')) expect(c.update).not.toHaveBeenCalled()
   })
 })
 
