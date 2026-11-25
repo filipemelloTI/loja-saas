@@ -67,50 +67,44 @@ function escaparCuringas(termo: string) {
   return termo.replace(/[\\%_]/g, '\\$&')
 }
 
-/** Valor entre aspas no filtro `or` do PostgREST: vírgula, parêntese e ponto deixam de ter sentido especial. */
-function entreAspas(valor: string) {
-  return `"${valor.replace(/[\\"]/g, '\\$&')}"`
-}
-
 /**
  * Procura em nome, telefone, CPF e IMEI das OS do cliente. Termo vazio devolve os mais recentes.
- * O IMEI mora em `ordens_servico`: primeiro acha os clientes dessas OS (pela RLS), depois junta no filtro.
+ * São consultas separadas com `.ilike()` (em paralelo), unidas aqui: o `.or()` do PostgREST com o
+ * valor entre aspas consome a barra do escape e faz `%`/`_` virarem curinga de novo.
+ * O IMEI mora em `ordens_servico`: acha os clientes dessas OS (pela RLS) e busca esses clientes.
  * Erro do banco vira lista vazia; o termo (pode ser CPF) não vai para o log.
  */
 export async function buscarClientesCom(deps: Pick<Dependencias, 'supabase'>, termo: string): Promise<Cliente[]> {
   const limpo = termo.trim()
+  const clientes = () => deps.supabase.from('clientes').select(COLUNAS_CLIENTE)
   if (!limpo) {
-    const { data, error } = await deps.supabase
-      .from('clientes')
-      .select(COLUNAS_CLIENTE)
-      .order('criado_em', { ascending: false }).limit(LIMITE_BUSCA)
-    return resultadoDaBusca(data, error)
+    const { data, error } = await clientes().order('criado_em', { ascending: false }).limit(LIMITE_BUSCA)
+    if (error) return resultadoDaBusca([{ data, error }])
+    return (data ?? []) as Cliente[] // já vem do mais recente para o mais antigo
   }
 
   const padrao = `%${escaparCuringas(limpo)}%`
-  const os = await deps.supabase
-    .from('ordens_servico')
-    .select('cliente_id')
-    .ilike('imei', padrao)
-    .not('cliente_id', 'is', null)
-    .limit(LIMITE_BUSCA)
-  const idsPorImei = [...new Set(((os.data ?? []) as { cliente_id: string }[]).map((o) => o.cliente_id))]
-
-  const valor = entreAspas(padrao)
-  const filtros = [`nome.ilike.${valor}`, `telefone.ilike.${valor}`, `cpf.ilike.${valor}`]
-  if (idsPorImei.length) filtros.push(`id.in.(${idsPorImei.join(',')})`)
-
-  const { data, error } = await deps.supabase
-    .from('clientes')
-    .select(COLUNAS_CLIENTE)
-    .or(filtros.join(',')).order('nome').limit(LIMITE_BUSCA)
-  return resultadoDaBusca(data, error)
+  const [nome, telefone, cpf, os] = await Promise.all([
+    clientes().ilike('nome', padrao).limit(LIMITE_BUSCA),
+    clientes().ilike('telefone', padrao).limit(LIMITE_BUSCA),
+    clientes().ilike('cpf', padrao).limit(LIMITE_BUSCA),
+    deps.supabase.from('ordens_servico').select('cliente_id').ilike('imei', padrao).not('cliente_id', 'is', null).limit(LIMITE_BUSCA),
+  ])
+  const ids = [...new Set(((os.data ?? []) as { cliente_id: string }[]).map((o) => o.cliente_id))]
+  const porImei = ids.length && !os.error ? [await clientes().in('id', ids).limit(LIMITE_BUSCA)] : []
+  return resultadoDaBusca([nome, telefone, cpf, { data: null, error: os.error }, ...porImei])
 }
 
-function resultadoDaBusca(data: unknown, error: { code?: string } | null): Cliente[] {
-  if (error) {
-    console.error('buscarClientes: falhou', { code: error.code })
+type RespostaBusca = { data: unknown; error: { code?: string } | null }
+
+/** Junta as respostas sem repetir cliente, em ordem de nome; qualquer erro do banco vira lista vazia. */
+function resultadoDaBusca(respostas: RespostaBusca[]): Cliente[] {
+  const falha = respostas.find((r) => r.error)
+  if (falha) {
+    console.error('buscarClientes: falhou', { code: falha.error?.code })
     return []
   }
-  return (data ?? []) as Cliente[]
+  const porId = new Map<string, Cliente>()
+  for (const r of respostas) for (const c of (r.data ?? []) as Cliente[]) porId.set(c.id, c)
+  return [...porId.values()].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).slice(0, LIMITE_BUSCA)
 }

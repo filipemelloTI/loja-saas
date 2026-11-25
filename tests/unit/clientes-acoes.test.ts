@@ -9,7 +9,7 @@ function clienteFalso(respostas: Partial<Record<string, Resposta[]>> = {}) {
   const cadeia = (tabela: string) => {
     const proxima = () => respostas[tabela]?.shift() ?? { data: null, error: null }
     const c: Record<string, unknown> = {}
-    for (const m of ['insert', 'update', 'select', 'eq', 'or', 'ilike', 'not', 'order', 'limit']) c[m] = vi.fn(() => c)
+    for (const m of ['insert', 'update', 'select', 'eq', 'in', 'ilike', 'not', 'order', 'limit']) c[m] = vi.fn(() => c)
     c.single = vi.fn(async () => proxima())
     c.maybeSingle = vi.fn(async () => proxima())
     c.then = (ok: (r: Resposta) => unknown, falha: (e: unknown) => unknown) => Promise.resolve(proxima()).then(ok, falha)
@@ -97,62 +97,54 @@ describe('buscarClientes', () => {
     expect(supabase.from).toHaveBeenCalledTimes(1)
     const c = supabase.from.mock.results[0].value
     expect(c.order).toHaveBeenCalledWith('criado_em', { ascending: false })
-    expect(c.or).not.toHaveBeenCalled()
+    expect(c.ilike).not.toHaveBeenCalled()
   })
 
-  it('escapa % e _ para não virarem curinga: "100%" procura o literal', async () => {
-    const supabase = clienteFalso({ clientes: [{ data: [], error: null }] })
+  // O fake só prova o que é entregue ao supabase-js; que o Postgres trate `%` como literal
+  // foi conferido à mão contra o banco real (o `.or()` com aspas NÃO respeita o escape, por isso não se usa).
+  it('escapa % e _ para não virarem curinga: "100%" vai como 100\\% em cada coluna', async () => {
+    const supabase = clienteFalso()
     await buscarClientesCom(deps({ supabase }), '100%')
-    const filtroOS = supabase.from.mock.results[0].value.ilike
-    expect(supabase.from.mock.calls[0][0]).toBe('ordens_servico')
-    expect(filtroOS).toHaveBeenCalledWith('imei', '%100\\%%')
-    const filtro = supabase.from.mock.results[1].value.or
-    expect(filtro).toHaveBeenCalledTimes(1)
-    const texto = filtro.mock.calls[0][0] as string
-    // `\%` do LIKE, com a barra dobrada para o PostgREST.
-    expect(texto).toContain('nome.ilike."%100\\\\%%"')
-    expect(texto).toContain('telefone.ilike."%100\\\\%%"')
-    expect(texto).toContain('cpf.ilike."%100\\\\%%"')
-    expect(texto).not.toContain('%100%')
+    const chamadas = supabase.from.mock.calls.map((c, i) => [c[0], supabase.from.mock.results[i].value.ilike.mock.calls[0]])
+    expect(chamadas).toEqual([
+      ['clientes', ['nome', '%100\\%%']],
+      ['clientes', ['telefone', '%100\\%%']],
+      ['clientes', ['cpf', '%100\\%%']],
+      ['ordens_servico', ['imei', '%100\\%%']],
+    ])
   })
 
-  it('escapa também o sublinhado', async () => {
-    const supabase = clienteFalso({ clientes: [{ data: [], error: null }] })
-    await buscarClientesCom(deps({ supabase }), 'a_b')
-    expect(supabase.from.mock.results[0].value.ilike).toHaveBeenCalledWith('imei', '%a\\_b%')
+  it('escapa também o sublinhado e a barra', async () => {
+    const supabase = clienteFalso()
+    await buscarClientesCom(deps({ supabase }), 'a_b\\c')
+    expect(supabase.from.mock.results[0].value.ilike).toHaveBeenCalledWith('nome', '%a\\_b\\\\c%')
   })
 
-  it('vírgula, parêntese e aspas no termo não quebram nem injetam filtro', async () => {
-    const supabase = clienteFalso({ clientes: [{ data: [], error: null }] })
-    await buscarClientesCom(deps({ supabase }), 'x",id.neq.0)')
-    const texto = supabase.from.mock.results[1].value.or.mock.calls[0][0] as string
-    expect(texto).toContain('nome.ilike."%x\\",id.neq.0)%"')
-  })
-
-  it('procura também pelo IMEI da OS do cliente', async () => {
+  it('procura também pelo IMEI da OS do cliente e junta sem repetir, em ordem de nome', async () => {
+    const zeca = { ...linha, id: 'C8', nome: 'Zeca' }
     const supabase = clienteFalso({
-      ordens_servico: [{ data: [{ cliente_id: 'C7' }, { cliente_id: 'C7' }, { cliente_id: 'C8' }], error: null }],
-      clientes: [{ data: [linha], error: null }],
+      clientes: [
+        { data: [zeca], error: null },
+        { data: [], error: null },
+        { data: [], error: null },
+        { data: [zeca, linha], error: null },
+      ],
+      ordens_servico: [{ data: [{ cliente_id: 'C1' }, { cliente_id: 'C1' }, { cliente_id: 'C8' }], error: null }],
     })
     const r = await buscarClientesCom(deps({ supabase }), '3567')
-    expect(r).toEqual([linha])
-    const texto = supabase.from.mock.results[1].value.or.mock.calls[0][0] as string
-    expect(texto).toContain('id.in.(C7,C8)')
+    expect(r).toEqual([linha, zeca])
+    expect(supabase.from.mock.results[4].value.in).toHaveBeenCalledWith('id', ['C1', 'C8'])
   })
 
-  it('sem OS com esse IMEI: o filtro não leva cláusula de id', async () => {
-    const supabase = clienteFalso({ ordens_servico: [{ data: [], error: null }], clientes: [{ data: [], error: null }] })
+  it('sem OS com esse IMEI: não faz a consulta por id', async () => {
+    const supabase = clienteFalso()
     await buscarClientesCom(deps({ supabase }), 'ana')
-    const texto = supabase.from.mock.results[1].value.or.mock.calls[0][0] as string
-    expect(texto).not.toContain('id.in')
+    expect(supabase.from).toHaveBeenCalledTimes(4)
   })
 
-  it('erro do banco: lista vazia, sem estourar com texto do Postgres', async () => {
+  it('erro do banco: lista vazia, sem estourar nem logar o termo', async () => {
     const erro = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const supabase = clienteFalso({
-      ordens_servico: [{ data: [], error: null }],
-      clientes: [{ error: { code: 'XX000', message: 'relation "clientes" exploded' } }],
-    })
+    const supabase = clienteFalso({ clientes: [{ error: { code: 'XX000', message: 'relation "clientes" exploded' } }] })
     expect(await buscarClientesCom(deps({ supabase }), '52998224725')).toEqual([])
     expect(JSON.stringify(erro.mock.calls)).not.toContain('52998224725')
     erro.mockRestore()
