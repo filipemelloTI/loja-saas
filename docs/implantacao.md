@@ -186,6 +186,38 @@ Tudo que mordeu durante a montagem. Formato do projeto: **sintoma → causa → 
 
 ---
 
+## Senha do aparelho — o que a cifra protege, e o que NÃO protege
+
+A senha do aparelho que o cliente deixa na loja é guardada cifrada em `os_senha_aparelho.senha_cifrada` (`pgp_sym_encrypt` com chave derivada do Supabase Vault), lida só pela função `senha_aparelho(os uuid)` e apagada automaticamente quando a OS é encerrada (`entregue` ou `devolvido`). Nada disso aparece na tela até o Dono ou o técnico clicar em "Mostrar senha".
+
+**O que a cifra protege:**
+
+- **Vazamento de backup/dump do banco** — sem a chave do Vault, o dump só tem bytes cifrados.
+- **Outra loja** — a RLS esconde a linha, e mesmo com a linha em mãos a função `senha_aparelho` confere a loja da sessão.
+- **Atendente** — a função `senha_aparelho` devolve `null` para quem não é Dono nem técnico.
+- **Admin em suporte (`em_suporte()`)** — mesma recusa; confirmado por teste pgTAP.
+- **`service_role` (a chave usada no servidor Netlify e nos scripts admin)** — a função `chave_senha_aparelho()` tem `EXECUTE` revogado inclusive do `service_role`; o `revoke` na tabela `os_senha_aparelho` fecha o caminho direto. Ou seja, nem o próprio backend lê a senha do aparelho.
+
+**O que a cifra NÃO protege (e você, o Filipe, precisa saber):**
+
+1. **Superusuário do Postgres.** Pelo editor SQL do Supabase (que roda como `postgres`), você lê a chave do Vault e a tabela `os_senha_aparelho`. Isso é desenho: superusuário manda no banco. O balcão fica protegido do usuário interno (atendente) e do suporte; não do dono do projeto Supabase.
+2. **Sem rotação de chave.** A chave é gerada uma vez na primeira migração. Se vazar a chave do Vault, a troca exige regerar a chave e reescrever a cifra de todas as OS abertas — não há script pronto. Mitigação natural: OS encerrada apaga a senha, então o buraco se fecha com a conclusão dos reparos.
+3. **Perda em restore sem a chave-raiz do Vault.** Um restore sem a mesma chave-raiz deixa as senhas cifradas ilegíveis. O pior caso é o lojista pedir a senha ao cliente de novo nas OS abertas.
+
+Antes do merge em produção, confirme no painel do Supabase hospedado (SQL Editor, logado como `postgres`):
+
+```sql
+-- authenticated e anon não devem ter USAGE no schema vault
+select nspname, has_schema_privilege('authenticated', nspname, 'USAGE') as authenticated,
+                 has_schema_privilege('anon',           nspname, 'USAGE') as anon
+from pg_namespace where nspname = 'vault';
+-- Esperado: authenticated=false, anon=false.
+```
+
+Se qualquer um der `true`, pare o merge e chame pelo canal de suporte do Supabase antes de prosseguir.
+
+---
+
 ## Rodar os testes (referência)
 
 ```bash
