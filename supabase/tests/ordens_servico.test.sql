@@ -1,5 +1,5 @@
 begin;
-select plan(20);
+select plan(23);
 
 grant usage on schema testes to authenticated;
 grant execute on function testes.entrar_como(uuid), testes.sair() to authenticated;
@@ -75,6 +75,22 @@ select is(
   (select status::text from ordens_servico where numero = 1000),
   'aberta', 'Status inicial é aberta');
 
+-- Número nunca reaproveitado: apagar a última OS não libera o número.
+insert into ordens_servico (loja_id, interna, aparelho_tipo, defeito_relatado)
+values ((select id from ids where chave = 'loja_a'), true, 'celular', 'Temporária');
+select is(
+  (select max(numero) from ordens_servico where loja_id = (select id from ids where chave = 'loja_a')),
+  1002, 'A terceira OS da loja A recebe 1002');
+delete from ordens_servico where numero = 1002
+  and loja_id = (select id from ids where chave = 'loja_a');
+insert into ordens_servico (loja_id, interna, aparelho_tipo, defeito_relatado)
+values ((select id from ids where chave = 'loja_a'), true, 'celular', 'Depois da exclusão');
+select is(
+  (select max(numero) from ordens_servico where loja_id = (select id from ids where chave = 'loja_a')),
+  1003, 'Após apagar a OS 1002, a próxima OS recebe 1003 e não reaproveita 1002');
+delete from ordens_servico where numero = 1003
+  and loja_id = (select id from ids where chave = 'loja_a');
+
 -- Coerência cliente x interna -------------------------------------------
 select throws_ok(
   format($$insert into ordens_servico (loja_id, interna, cliente_id, aparelho_tipo, defeito_relatado)
@@ -90,8 +106,9 @@ select throws_ok(
 -- Dono A ----------------------------------------------------------------
 select testes.entrar_como((select id from ids where chave = 'dono_a'));
 
-select is((select count(*) from ordens_servico), 2::bigint,
-  'Dono A lê só as OS da própria loja');
+select is(
+  (select array_agg(numero order by numero) from ordens_servico),
+  array[1000, 1001], 'Dono A lê apenas as OS da loja A');
 select results_eq(
   $$update ordens_servico set laudo = 'Trocar tela' where numero = 1000 returning laudo$$,
   array['Trocar tela'],
@@ -103,13 +120,17 @@ select throws_ok(
 select throws_ok(
   format($$update ordens_servico set loja_id = %L where numero = 1000$$,
          (select id from ids where chave = 'loja_b')),
-  '42501', null, 'Dono A não troca a loja de uma OS');
+  '42501', 'Não é permitido trocar o número ou a loja de uma ordem de serviço',
+  'Dono A não troca a loja de uma OS (barrado pelo gatilho, não pela RLS)');
 select is(
   (select numero from ordens_servico where laudo = 'Trocar tela'),
   1000, 'O número da OS segue o original após as tentativas de troca');
 select lives_ok(
   $$update ordens_servico set observacao = 'Cliente avisado' where numero = 1000$$,
   'Dono A ainda atualiza colunas comuns da OS');
+select ok(
+  (select atualizado_em > criado_em from ordens_servico where numero = 1000),
+  'atualizado_em avança quando a OS é atualizada');
 
 -- Dono B ----------------------------------------------------------------
 select testes.entrar_como((select id from ids where chave = 'dono_b'));
