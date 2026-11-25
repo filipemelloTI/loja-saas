@@ -3,33 +3,33 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { AreaProtegida } from '@/components/AreaProtegida'
+import { Roda } from '@/components/ui/Botao'
 import { Cartao } from '@/components/ui/Cartao'
 import { Selo } from '@/components/ui/Selo'
 import { TabelaResponsiva } from '@/components/ui/TabelaResponsiva'
 import { formatarCpf, formatarData, formatarDataISO, formatarTelefone } from '@/lib/formatar'
 import { ROTULO_STATUS, type StatusOS } from '@/lib/os-status'
+import { ROTULO_APARELHO } from '@/lib/rotulos'
 import { contextoAtual } from '@/lib/sessao'
 import { FormularioCliente } from '../_componentes/formulario'
 import { carregarCliente, carregarHistoricoDoCliente } from '../dados'
 
 export const metadata: Metadata = { title: 'Cliente' }
 
-const ROTULO_APARELHO: Record<string, string> = {
-  celular: 'Celular',
-  tablet: 'Tablet',
-  relogio: 'Relógio',
-  notebook: 'Notebook',
-  outro: 'Outro',
-}
-
 export default function PaginaCliente({ params }: PageProps<'/clientes/[id]'>) {
   return (
     <AreaProtegida area="clientes">
       <div className="flex flex-col gap-6">
         <Link href="/clientes" className="inline-flex min-h-11 items-center self-start text-sm font-semibold text-marca hover:underline">
-          ← Clientes
+          <span aria-hidden="true">←&nbsp;</span>Clientes
         </Link>
-        <Suspense fallback={<p className="text-tinta-suave">Carregando…</p>}>
+        <Suspense
+          fallback={
+            <p role="status" className="flex items-center gap-2 text-tinta-suave">
+              <Roda /> Carregando…
+            </p>
+          }
+        >
           <Conteudo params={params} />
         </Suspense>
       </div>
@@ -78,14 +78,14 @@ async function Conteudo({ params }: { params: PageProps<'/clientes/[id]'>['param
             { titulo: 'OS', valor: (o) => <span className="numeros">Nº {o.numero}</span> },
             {
               titulo: 'Aparelho',
-              valor: (o) => [ROTULO_APARELHO[o.aparelhoTipo] ?? o.aparelhoTipo, o.marca, o.modelo].filter(Boolean).join(' · '),
+              valor: (o) => [ROTULO_APARELHO[o.aparelhoTipo] ?? 'Aparelho', o.marca, o.modelo].filter(Boolean).join(' · '),
             },
             { titulo: 'IMEI', valor: (o) => <span className="numeros">{o.imei ?? '—'}</span> },
             {
               titulo: 'Situação',
               valor: (o) => {
                 const s = ROTULO_STATUS[o.status as StatusOS]
-                return <Selo tom={s?.tom}>{s?.rotulo ?? o.status}</Selo>
+                return <Selo tom={s?.tom}>{s?.rotulo ?? 'Em andamento'}</Selo>
               },
             },
             { titulo: 'Aberta em', valor: (o) => <span className="numeros">{formatarData(o.criadoEm)}</span> },

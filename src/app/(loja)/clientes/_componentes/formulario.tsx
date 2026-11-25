@@ -25,27 +25,32 @@ export function FormularioCliente({ cliente, somenteLeitura }: { cliente?: Clien
     const dados = new FormData(formulario)
     const texto = (nome: string) => String(dados.get(nome) ?? '')
     iniciar(async () => {
-      const r = await salvarCliente(
-        {
-          nome: texto('nome'),
-          telefone: texto('telefone'),
-          cpf: texto('cpf'),
-          email: texto('email'),
-          endereco: texto('endereco'),
-          nascimento: texto('nascimento'),
-        },
-        cliente?.id,
-      )
-      if (!r.ok) return setMsg({ ok: false, texto: r.erro })
-      setMsg({ ok: true, texto: cliente ? 'Alterações salvas.' : 'Cliente cadastrado.' })
-      if (!cliente) formulario.reset()
+      try {
+        const r = await salvarCliente(
+          {
+            nome: texto('nome'),
+            telefone: texto('telefone'),
+            cpf: texto('cpf'),
+            email: texto('email'),
+            endereco: texto('endereco'),
+            nascimento: texto('nascimento'),
+          },
+          cliente?.id,
+        )
+        if (!r.ok) return setMsg({ ok: false, texto: r.erro })
+        setMsg({ ok: true, texto: cliente ? 'Alterações salvas.' : 'Cliente cadastrado.' })
+        if (!cliente) formulario.reset()
+      } catch {
+        // Conexão caiu no meio: o que foi digitado fica na tela para tentar de novo.
+        setMsg({ ok: false, texto: 'Não foi possível salvar agora. Tente de novo.' })
+      }
     })
   }
 
   const prefixo = cliente ? 'editar' : 'novo'
 
   return (
-    <form onSubmit={enviar}>
+    <form onSubmit={enviar} onChange={() => setMsg(null)}>
       <fieldset disabled={somenteLeitura} className="flex flex-col gap-4">
         <legend className="sr-only">{cliente ? `Dados de ${cliente.nome}` : 'Novo cliente'}</legend>
         <div className="grid gap-4 sm:grid-cols-2">
