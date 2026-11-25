@@ -42,31 +42,57 @@ create index os_loja_status_idx on public.ordens_servico (loja_id, status);
 create index os_loja_criado_idx on public.ordens_servico (loja_id, criado_em desc);
 create index os_loja_imei_idx on public.ordens_servico (loja_id, imei);
 
+-- Contador monotônico por loja: apagar a última OS NÃO pode liberar o número,
+-- que já foi impresso no comprovante do cliente.
+alter table public.config_loja
+  add column os_ultimo_numero int not null default 0 check (os_ultimo_numero >= 0);
+
 -- Numeração sequencial por loja, começando em config_loja.os_numero_inicial.
--- Trava a linha da loja (mesma técnica de verificar_limite_usuarios) para
--- duas OS simultâneas não pegarem o mesmo número; unique (loja_id, numero)
--- é a rede de segurança que transforma qualquer escape em erro visível.
+-- O próprio UPDATE trava a linha de config_loja da loja, então duas OS simultâneas na
+-- mesma loja são numeradas em fila; unique (loja_id, numero) é a rede de segurança
+-- que transforma qualquer escape em erro visível.
 create function public.numerar_os()
 returns trigger
 language plpgsql security definer
 set search_path = public, pg_temp
 as $$
 begin
-  perform 1 from lojas where id = new.loja_id for update;
+  update config_loja
+     set os_ultimo_numero = greatest(os_ultimo_numero + 1, os_numero_inicial)
+   where loja_id = new.loja_id
+  returning os_ultimo_numero into new.numero;
 
-  select greatest(
-           coalesce(max(o.numero) + 1, 1),
-           (select c.os_numero_inicial from config_loja c
-            where c.loja_id = new.loja_id))
-    into new.numero
-  from ordens_servico o
-  where o.loja_id = new.loja_id;
+  -- Defesa: todo config_loja nasce com a loja, mas sem a linha ainda numeramos.
+  if not found then
+    select coalesce(max(numero) + 1, 1) into new.numero
+    from ordens_servico where loja_id = new.loja_id;
+  end if;
   return new;
 end;
 $$;
 
 create trigger numerar_os before insert on public.ordens_servico
   for each row execute function public.numerar_os();
+
+-- O número da OS vai impresso no comprovante do cliente: depois de criada,
+-- nem ele nem a loja da OS mudam, exceto pelo servidor.
+create function public.proteger_numero_os()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if current_user in ('authenticated', 'anon')
+     and (new.numero, new.loja_id) is distinct from (old.numero, old.loja_id) then
+    raise exception 'Não é permitido trocar o número ou a loja de uma ordem de serviço'
+      using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger proteger_numero_os before update on public.ordens_servico
+  for each row execute function public.proteger_numero_os();
 
 create function public.os_atualizado_em()
 returns trigger
