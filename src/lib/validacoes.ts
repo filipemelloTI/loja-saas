@@ -109,9 +109,9 @@ export const esquemaNovaOS = z
       .array(z.object({ nome: z.string().trim().min(1, 'Informe o nome do item'), marcado: z.boolean(), observacao: textoOpcional }))
       .optional(),
     observacao: textoOpcional,
-    tecnicoId: z.string().optional(),
+    tecnicoId: opcional(z.string().trim()),
     previsaoEntrega: opcional(z.iso.date('Data inválida')),
-    senhaAparelho: z.string().optional(),
+    senhaAparelho: opcional(z.string()),
   })
   .superRefine((v, ctx) => {
     const temCliente = !!v.clienteId

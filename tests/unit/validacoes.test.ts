@@ -164,6 +164,21 @@ describe('esquemaNovaOS', () => {
       expect([r.data.marca, r.data.modelo, r.data.cor, r.data.imei, r.data.observacao, r.data.previsaoEntrega]).toEqual(Array(6).fill(undefined))
     }
   })
+  it('técnico e senha em branco viram undefined', () => {
+    for (const vazio of ['', '   ']) {
+      const r = esquemaNovaOS.safeParse({ ...base, interna: true, tecnicoId: vazio, senhaAparelho: vazio })
+      expect(r.success).toBe(true)
+      if (r.success) {
+        expect(r.data.tecnicoId).toBeUndefined()
+        expect(r.data.senhaAparelho).toBeUndefined()
+      }
+    }
+  })
+  it('mantém técnico e senha preenchidos', () => {
+    const r = esquemaNovaOS.parse({ ...base, interna: true, tecnicoId: 't1', senhaAparelho: ' 12 34 ' })
+    expect(r.tecnicoId).toBe('t1')
+    expect(r.senhaAparelho).toBe(' 12 34 ')
+  })
   it('apara marca preenchida', () => {
     expect(esquemaNovaOS.parse({ ...base, interna: true, marca: '  Apple ' }).marca).toBe('Apple')
   })
