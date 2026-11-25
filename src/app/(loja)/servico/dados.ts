@@ -22,3 +22,25 @@ export async function carregarOS(id: string): Promise<{ os: OSCompleta | null; s
   const { supabase, somenteLeitura, perfil } = await base()
   return { os: await carregarOSCom({ supabase, perfil }, id), somenteLeitura }
 }
+
+export type ItemChecklist = { id: string; nome: string }
+export type Tecnico = { id: string; nome: string }
+
+/** Itens de checklist que a loja deixou ativos, na ordem que ela escolheu. A OS copia só os nomes. */
+export async function listarChecklistDaLoja(): Promise<ItemChecklist[]> {
+  const { supabase } = await base()
+  const { data } = await supabase.from('checklist_itens').select('id, nome').eq('ativo', true).order('ordem')
+  return ((data ?? []) as ItemChecklist[]).map(({ id, nome }) => ({ id, nome }))
+}
+
+/** Quem pode ficar com o conserto: membros ativos que são técnico ou Dono. */
+export async function listarTecnicos(): Promise<Tecnico[]> {
+  const { supabase } = await base()
+  const { data } = await supabase
+    .from('membros')
+    .select('id, nome')
+    .eq('ativo', true)
+    .in('perfil', ['tecnico', 'dono'])
+    .order('nome')
+  return ((data ?? []) as Tecnico[]).map(({ id, nome }) => ({ id, nome }))
+}
