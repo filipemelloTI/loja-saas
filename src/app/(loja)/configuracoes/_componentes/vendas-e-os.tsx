@@ -150,8 +150,8 @@ export function FormularioVendasOS({ inicial, somenteLeitura }: { inicial: Confi
 
         <Retorno msg={msg} />
         <div>
-          <Botao type="submit" disabled={pendente}>
-            {pendente ? 'Salvando…' : 'Salvar configurações'}
+          <Botao type="submit" carregando={pendente} rotuloCarregando="Salvando…">
+            Salvar configurações
           </Botao>
         </div>
       </fieldset>

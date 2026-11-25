@@ -6,7 +6,7 @@ import { Suspense, useState, useTransition, type FormEvent } from 'react'
 import { CaixaLink } from '@/components/CaixaLink'
 import { Alerta, Aviso } from '@/components/ui/Avisos'
 import { Botao, classesBotao } from '@/components/ui/Botao'
-import { Campo } from '@/components/ui/Campo'
+import { Campo, TodosObrigatorios } from '@/components/ui/Campo'
 import { Cartao } from '@/components/ui/Cartao'
 import { validarModulos } from '@/lib/permissoes'
 import { MODULOS, ROTULO_MODULO, SITUACAO, type Situacao } from '@/lib/rotulos'
@@ -172,6 +172,7 @@ export function FormularioNovaLoja({ planos }: { planos: Plano[] }) {
 
   return (
     <form onSubmit={enviar} className="flex flex-col gap-5">
+      <TodosObrigatorios />
       <Cartao titulo="Loja">
         <div className="flex flex-col gap-4">
           <Campo name="nomeLoja" rotulo="Nome da loja" required autoComplete="off" />
@@ -194,8 +195,13 @@ export function FormularioNovaLoja({ planos }: { planos: Plano[] }) {
       </Cartao>
       {erro && <Alerta>{erro}</Alerta>}
       <div className="flex flex-wrap gap-2">
-        <Botao type="submit" disabled={pendente || !validarModulos(modulos).ok}>
-          {pendente ? 'Criando…' : 'Criar loja'}
+        <Botao
+          type="submit"
+          carregando={pendente}
+          rotuloCarregando="Criando…"
+          disabled={!validarModulos(modulos).ok}
+        >
+          Criar loja
         </Botao>
         <Link href="/plataforma" className={classesBotao('discreto')}>
           Cancelar
@@ -290,8 +296,13 @@ export function FormularioLoja({ loja, planos }: { loja: Loja; planos: Plano[] }
         <div className="flex flex-col gap-3">
           {msg && (msg.ok ? <Aviso>{msg.texto}</Aviso> : <Alerta>{msg.texto}</Alerta>)}
           <div>
-            <Botao type="submit" disabled={pendente || !validarModulos(modulos).ok}>
-              {pendente ? 'Salvando…' : 'Salvar alterações'}
+            <Botao
+              type="submit"
+              carregando={pendente}
+              rotuloCarregando="Salvando…"
+              disabled={!validarModulos(modulos).ok}
+            >
+              Salvar alterações
             </Botao>
           </div>
         </div>
@@ -329,8 +340,8 @@ export function LinkDono({ lojaId, dono }: { lojaId: string; dono: { nome: strin
         <CaixaLink link={link} para="o Dono" />
       ) : (
         <div>
-          <Botao variante="secundario" onClick={gerar} disabled={pendente}>
-            {pendente ? 'Gerando…' : 'Gerar novo link de senha'}
+          <Botao variante="secundario" onClick={gerar} carregando={pendente} rotuloCarregando="Gerando…">
+            Gerar novo link de senha
           </Botao>
         </div>
       )}
@@ -383,8 +394,14 @@ export function FormularioPlano({ plano }: { plano?: Plano }) {
       <EscolhaModulos valor={modulos} aoMudar={setModulos} />
       {msg && (msg.ok ? <Aviso>{msg.texto}</Aviso> : <Alerta>{msg.texto}</Alerta>)}
       <div>
-        <Botao type="submit" variante={plano ? 'secundario' : 'primario'} disabled={pendente || !validarModulos(modulos).ok}>
-          {pendente ? 'Salvando…' : plano ? 'Salvar plano' : 'Criar plano'}
+        <Botao
+          type="submit"
+          variante={plano ? 'secundario' : 'primario'}
+          carregando={pendente}
+          rotuloCarregando="Salvando…"
+          disabled={!validarModulos(modulos).ok}
+        >
+          {plano ? 'Salvar plano' : 'Criar plano'}
         </Botao>
       </div>
     </form>

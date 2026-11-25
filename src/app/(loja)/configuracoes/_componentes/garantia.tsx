@@ -59,8 +59,8 @@ export function FormularioPrazos({ inicial, somenteLeitura }: { inicial: Prazos;
           </div>
           <Retorno msg={msg} />
           <div>
-            <Botao type="submit" disabled={pendente}>
-              {pendente ? 'Salvando…' : 'Salvar prazos'}
+            <Botao type="submit" carregando={pendente} rotuloCarregando="Salvando…">
+              Salvar prazos
             </Botao>
           </div>
         </fieldset>
@@ -141,8 +141,8 @@ export function FormularioCondicoes({ condicoes, somenteLeitura }: { condicoes: 
           </div>
           <Retorno msg={msg} />
           <div>
-            <Botao type="submit" disabled={pendente}>
-              {pendente ? 'Salvando…' : 'Salvar condições'}
+            <Botao type="submit" carregando={pendente} rotuloCarregando="Salvando…">
+              Salvar condições
             </Botao>
           </div>
         </fieldset>

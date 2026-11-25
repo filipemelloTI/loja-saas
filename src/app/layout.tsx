@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next'
-import { Bricolage_Grotesque, Figtree } from 'next/font/google'
-import { NOME_SISTEMA } from '@/lib/marca'
+import { Bricolage_Grotesque, Figtree, JetBrains_Mono } from 'next/font/google'
+import { DESCRICAO_SISTEMA, NOME_SISTEMA } from '@/lib/marca'
 import './globals.css'
 
 const fonteTitulo = Bricolage_Grotesque({
@@ -15,9 +15,16 @@ const fonteTexto = Figtree({
   weight: ['400', '500', '600', '700'],
 })
 
+/** Terceira voz: rótulos de seção, cabeçalho de tabela, códigos. Ver `.sobrancelha`. */
+const fonteMono = JetBrains_Mono({
+  variable: '--fonte-mono',
+  subsets: ['latin'],
+  weight: ['400', '500'],
+})
+
 export const metadata: Metadata = {
   title: { default: NOME_SISTEMA, template: `%s | ${NOME_SISTEMA}` },
-  description: 'Ordens de serviço, estoque e vendas da sua loja de celular, no celular e no computador.',
+  description: DESCRICAO_SISTEMA,
   applicationName: NOME_SISTEMA,
   appleWebApp: { capable: true, title: NOME_SISTEMA, statusBarStyle: 'default' },
   icons: {
@@ -36,7 +43,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang="pt-BR" className={`${fonteTitulo.variable} ${fonteTexto.variable} h-full antialiased`}>
+    <html
+      lang="pt-BR"
+      className={`${fonteTitulo.variable} ${fonteTexto.variable} ${fonteMono.variable} h-full antialiased`}
+    >
       <body className="flex min-h-full flex-col">{children}</body>
     </html>
   )

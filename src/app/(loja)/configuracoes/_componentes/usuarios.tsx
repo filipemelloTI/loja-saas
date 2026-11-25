@@ -154,8 +154,8 @@ function NovoUsuario({ somenteLeitura }: { somenteLeitura: boolean }) {
         </div>
         {erro && <Alerta>{erro}</Alerta>}
         <div>
-          <Botao type="submit" disabled={pendente}>
-            {pendente ? 'Cadastrando…' : 'Cadastrar usuário'}
+          <Botao type="submit" carregando={pendente} rotuloCarregando="Cadastrando…">
+            Cadastrar usuário
           </Botao>
         </div>
       </fieldset>
@@ -206,8 +206,8 @@ function EditarUsuario({ usuario, somenteLeitura, aoFechar }: { usuario: Usuario
           />
           <Retorno msg={msg} />
           <div className="flex flex-wrap gap-2">
-            <Botao type="submit" disabled={pendente}>
-              {pendente ? 'Salvando…' : 'Salvar alterações'}
+            <Botao type="submit" carregando={pendente} rotuloCarregando="Salvando…">
+              Salvar alterações
             </Botao>
             <Botao variante="discreto" onClick={aoFechar}>
               Fechar

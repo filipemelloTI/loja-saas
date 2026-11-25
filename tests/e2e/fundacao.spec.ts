@@ -49,7 +49,9 @@ async function entrar(page: Page, email: string, senha: string) {
  * Strict Mode de dev), então o formulário aparece e permanece.
  */
 async function definirSenhaPeloLink(page: Page, linkUI: string, senha: string) {
-  const campoSenha = page.getByLabel('Nova senha (mínimo 8 caracteres)')
+  // O "mínimo 8 caracteres" é dica abaixo do campo (ligada por aria-describedby),
+  // não faz mais parte do rótulo.
+  const campoSenha = page.getByLabel('Nova senha')
   await page.goto(linkUI)
   // O formulário só aparece (e permanece) depois do verifyOtp (estado "pronto").
   await expect(campoSenha).toBeVisible()

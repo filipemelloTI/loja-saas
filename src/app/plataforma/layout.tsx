@@ -1,3 +1,4 @@
+import { BotaoEnviar } from '@/components/ui/BotaoEnviar'
 import { Icone } from '@/components/Icone'
 import { sair } from '@/lib/auth-acoes'
 import { NOME_SISTEMA } from '@/lib/marca'
@@ -12,20 +13,17 @@ export default function LayoutPlataforma({ children }: LayoutProps<'/plataforma'
     <div className="flex min-h-dvh flex-col">
       <header className="border-b border-linha bg-superficie">
         <div className="mx-auto flex min-h-16 max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-2 lg:px-8">
-          <div className="min-w-0">
-            <p className="truncate font-titulo text-lg font-semibold leading-tight">{NOME_SISTEMA}</p>
-            <p className="truncate text-sm text-tinta-suave">Painel da plataforma</p>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <p className="truncate font-titulo text-lg font-bold tracking-tight text-marca">{NOME_SISTEMA}</p>
+            <p className="sobrancelha truncate">Painel da plataforma</p>
           </div>
           <div className="flex items-center gap-2">
             <NavPlataforma />
             <form action={sair}>
-              <button
-                type="submit"
-                className="flex min-h-11 items-center gap-2 rounded-lg px-3 font-semibold text-tinta-suave hover:bg-superficie-2 hover:text-tinta"
-              >
+              <BotaoEnviar variante="discreto" rotuloCarregando="Saindo…">
                 <Icone nome="sair" className="size-5" />
                 Sair
-              </button>
+              </BotaoEnviar>
             </form>
           </div>
         </div>

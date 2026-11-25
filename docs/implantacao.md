@@ -162,6 +162,12 @@ Tudo que mordeu durante a montagem. Formato do projeto: **sintoma → causa → 
 | `supabase link` / `db push` pede chave e a antiga não serve | O **CLI 3.x** mudou: autentica por `supabase login` (access token) e o `link` pede a **senha do banco**, não a chave da API | `npx supabase login` primeiro; no `link`, usar a **senha do banco** definida ao criar o projeto. As chaves `anon`/`service_role` são só para a aplicação (variáveis do Netlify), não para o `link` |
 | Em produção o seletor de plano em "Nova loja" nasce **vazio** e não dá para criar loja | O único `insert into planos` fora dos testes está no `seed.sql`, que **não** roda no `db push` | Criar o plano Completo por SQL no painel (passo 7) antes de criar a loja; admin e lojas também são criados à mão (passos 6 e 8), não automaticamente |
 
+### Criação de loja
+
+| Sintoma | Causa | Solução |
+|---|---|---|
+| No detalhe da loja, **"Senha do Dono: A loja não tem Dono ativo"** logo após criar | A criação tem 3 etapas (criar loja → criar usuário do Dono no Auth → gravar o vínculo `membros`); se a 3ª falha (engasgo transitório de rede entre a função serverless e o Supabase), o rollback pode não completar e sobra uma **loja órfã**: existe, com o usuário do Dono criado, mas sem a linha em `membros` | Conferir no banco (`membros` da loja vazio, usuário do Dono existe no Auth). Consertar gravando o membro que faltou (`insert into membros (loja_id, user_id, nome, perfil) values (…, …, …, 'dono')` com a service role) e gerar novo link; **ou** apagar a loja órfã (sem membros nada trava o cascade) e recriar. Recriar costuma ir limpo — a falha é transitória, não um defeito |
+
 ### UI / navegador
 
 | Sintoma | Causa | Solução |

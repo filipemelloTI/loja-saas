@@ -1,13 +1,19 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { Marca } from '@/components/Marca'
+import { Alerta } from '@/components/ui/Avisos'
+import { Roda } from '@/components/ui/Botao'
+import { BotaoEnviar } from '@/components/ui/BotaoEnviar'
+import { Campo, TodosObrigatorios } from '@/components/ui/Campo'
+import { Cartao } from '@/components/ui/Cartao'
 import { criarClienteNavegador } from '@/lib/supabase/navegador'
 import { definirSenha } from '@/lib/auth-acoes'
 
 const MENSAGENS: Record<string, string> = {
   curta: 'A senha precisa ter no mínimo 8 caracteres.',
   diferente: 'As senhas não conferem.',
-  link: 'Link inválido ou expirado. Peça um novo link.',
+  link: 'Link inválido ou expirado. Peça um novo link para quem te convidou.',
 }
 
 export function FormularioSenha({ erro }: { erro?: string }) {
@@ -40,24 +46,50 @@ export function FormularioSenha({ erro }: { erro?: string }) {
     preparar()
   }, [])
 
+  const validando = !pronto && !linkInvalido
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 p-6">
-      <h1 className="text-2xl font-semibold">Definir senha</h1>
-      {erro && MENSAGENS[erro] && <p role="alert" className="text-red-600">{MENSAGENS[erro]}</p>}
-      {linkInvalido && !erro && <p role="alert" className="text-red-600">{MENSAGENS.link}</p>}
-      {pronto && !linkInvalido && (
-        <form action={definirSenha} className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1">
-            Nova senha (mínimo 8 caracteres)
-            <input name="senha" type="password" required minLength={8} autoComplete="new-password" className="rounded border p-2" />
-          </label>
-          <label className="flex flex-col gap-1">
-            Repita a senha
-            <input name="confirma" type="password" required minLength={8} autoComplete="new-password" className="rounded border p-2" />
-          </label>
-          <button type="submit" className="rounded bg-black p-2 text-white">Salvar senha</button>
-        </form>
-      )}
+    <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-6 p-6">
+      <Marca comDescricao />
+      <Cartao titulo="Criar sua senha">
+        <div className="flex flex-col gap-4">
+          {erro && MENSAGENS[erro] && <Alerta>{MENSAGENS[erro]}</Alerta>}
+          {linkInvalido && !erro && <Alerta>{MENSAGENS.link}</Alerta>}
+
+          {validando && (
+            <p role="status" className="flex items-center gap-2 text-tinta-suave">
+              <Roda />
+              Validando o seu link…
+            </p>
+          )}
+
+          {pronto && !linkInvalido && (
+            <form action={definirSenha} className="flex flex-col gap-4">
+              <TodosObrigatorios />
+              <Campo
+                name="senha"
+                rotulo="Nova senha"
+                dica="Mínimo de 8 caracteres."
+                type="password"
+                required
+                minLength={8}
+                autoComplete="new-password"
+              />
+              <Campo
+                name="confirma"
+                rotulo="Repita a senha"
+                type="password"
+                required
+                minLength={8}
+                autoComplete="new-password"
+              />
+              <BotaoEnviar rotuloCarregando="Salvando…" className="w-full">
+                Salvar senha e entrar
+              </BotaoEnviar>
+            </form>
+          )}
+        </div>
+      </Cartao>
     </main>
   )
 }

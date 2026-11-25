@@ -84,8 +84,13 @@ export function EditorMensagem({ evento, texto: inicial, somenteLeitura }: Props
           </div>
           <Retorno msg={msg} />
           <div className="flex flex-wrap gap-2">
-            <Botao type="submit" disabled={pendente || texto === inicial}>
-              {pendente ? 'Salvando…' : 'Salvar mensagem'}
+            <Botao
+              type="submit"
+              carregando={pendente}
+              rotuloCarregando="Salvando…"
+              disabled={texto === inicial}
+            >
+              Salvar mensagem
             </Botao>
             <Botao variante="discreto" onClick={restaurar} disabled={pendente || texto === MENSAGEM_PADRAO[evento]}>
               Restaurar padrão

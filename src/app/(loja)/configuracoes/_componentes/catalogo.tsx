@@ -167,8 +167,8 @@ function FormularioServico({ servico, garantiaPadrao, somenteLeitura, aoFechar }
         </p>
         <Retorno msg={msg} />
         <div className="flex flex-wrap gap-2">
-          <Botao type="submit" disabled={pendente}>
-            {pendente ? 'Salvando…' : servico ? 'Salvar serviço' : 'Cadastrar serviço'}
+          <Botao type="submit" carregando={pendente} rotuloCarregando="Salvando…">
+            {servico ? 'Salvar serviço' : 'Cadastrar serviço'}
           </Botao>
           <Botao variante="discreto" onClick={aoFechar}>
             {servico ? 'Fechar' : 'Cancelar'}

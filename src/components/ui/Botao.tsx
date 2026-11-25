@@ -18,8 +18,52 @@ export function classesBotao(variante: VarianteBotao = 'primario', extra = '') {
   return `${BASE} ${VARIANTES[variante]} ${extra}`.trim()
 }
 
-type Props = ButtonHTMLAttributes<HTMLButtonElement> & { variante?: VarianteBotao }
+/**
+ * Roda de carregando. Herda a cor de quem a contém (`currentColor`) e some com
+ * "reduzir movimento" ligado — lá o texto é que avisa a espera.
+ */
+export function Roda({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      className={`size-4 shrink-0 animate-spin motion-reduce:hidden ${className}`.trim()}
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="2.5" opacity="0.25" />
+      <path d="M8 1.5a6.5 6.5 0 0 1 6.5 6.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  )
+}
 
-export function Botao({ variante = 'primario', className = '', type = 'button', ...resto }: Props) {
-  return <button type={type} className={classesBotao(variante, className)} {...resto} />
+export type PropsBotao = ButtonHTMLAttributes<HTMLButtonElement> & {
+  variante?: VarianteBotao
+  /** Mostra a roda, desabilita o botão e marca `aria-busy`. */
+  carregando?: boolean
+  /** Texto enquanto carrega (ex.: "Salvando…"). Sem ele, o rótulo normal fica. */
+  rotuloCarregando?: string
+}
+
+export function Botao({
+  variante = 'primario',
+  className = '',
+  type = 'button',
+  carregando = false,
+  rotuloCarregando,
+  disabled,
+  children,
+  ...resto
+}: PropsBotao) {
+  return (
+    <button
+      type={type}
+      className={classesBotao(variante, className)}
+      disabled={disabled || carregando}
+      aria-busy={carregando || undefined}
+      {...resto}
+    >
+      {carregando && <Roda />}
+      {carregando && rotuloCarregando ? rotuloCarregando : children}
+    </button>
+  )
 }

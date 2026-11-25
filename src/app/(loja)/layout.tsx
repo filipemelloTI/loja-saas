@@ -1,6 +1,7 @@
 import { Suspense, type ReactNode } from 'react'
 import { redirect } from 'next/navigation'
 import { MenuInferior, MenuLateral } from '@/components/MenuLoja'
+import { BotaoEnviar } from '@/components/ui/BotaoEnviar'
 import { Icone } from '@/components/Icone'
 import { contextoAtual } from '@/lib/sessao'
 import { perfilEfetivo } from '@/lib/guarda'
@@ -38,18 +39,15 @@ async function Casca({ children }: { children: ReactNode }) {
       inferior={<MenuInferior itens={itens} />}
       topo={
         <>
-          <div className="min-w-0">
+          <div className="flex min-w-0 flex-col gap-0.5">
             <p className="truncate font-titulo text-lg font-semibold leading-tight lg:text-xl">{ctx.loja.nome}</p>
-            <p className="truncate text-sm text-tinta-suave">{quem}</p>
+            <p className="sobrancelha truncate">{quem}</p>
           </div>
           <form action={sair}>
-            <button
-              type="submit"
-              className="flex min-h-11 items-center gap-2 rounded-lg px-3 font-semibold text-tinta-suave hover:bg-superficie-2 hover:text-tinta"
-            >
+            <BotaoEnviar variante="discreto" rotuloCarregando="Saindo…">
               <Icone nome="sair" className="size-5" />
               Sair
-            </button>
+            </BotaoEnviar>
           </form>
         </>
       }
@@ -78,7 +76,7 @@ function Moldura({ suporte, topo, lateral, inferior, children }: PropsMoldura) {
       )}
       <div className="flex flex-1 lg:min-h-0">
         <aside className="hidden w-60 shrink-0 flex-col gap-6 overflow-y-auto bg-trilho px-3 py-5 lg:flex">
-          <p className="px-3 font-titulo text-base font-bold text-white">{NOME_SISTEMA}</p>
+          <p className="px-3 font-titulo text-lg font-bold tracking-tight text-marca">{NOME_SISTEMA}</p>
           {lateral}
         </aside>
         <div className="flex min-w-0 flex-1 flex-col lg:overflow-y-auto">

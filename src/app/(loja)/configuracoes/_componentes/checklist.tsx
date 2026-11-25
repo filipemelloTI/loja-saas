@@ -90,8 +90,8 @@ export function FormularioChecklist({ itens, somenteLeitura }: { itens: Item[]; 
           </div>
           <Retorno msg={msg} />
           <div>
-            <Botao type="submit" disabled={pendente}>
-              {pendente ? 'Salvando…' : 'Salvar checklist'}
+            <Botao type="submit" carregando={pendente} rotuloCarregando="Salvando…">
+              Salvar checklist
             </Botao>
           </div>
         </fieldset>

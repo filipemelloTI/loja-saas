@@ -64,8 +64,8 @@ export function FormularioLogo({ logoUrl, somenteLeitura }: { logoUrl: string | 
         </div>
         <Retorno msg={msg} />
         <div>
-          <Botao type="submit" variante="secundario" disabled={pendente}>
-            {pendente ? 'Enviando…' : 'Enviar logo'}
+          <Botao type="submit" variante="secundario" carregando={pendente} rotuloCarregando="Enviando…">
+            Enviar logo
           </Botao>
         </div>
       </fieldset>
@@ -134,8 +134,8 @@ export function FormularioDadosLoja({ inicial, somenteLeitura }: { inicial: Dado
         </Cartao>
         <Retorno msg={msg} />
         <div>
-          <Botao type="submit" disabled={pendente}>
-            {pendente ? 'Salvando…' : 'Salvar dados'}
+          <Botao type="submit" carregando={pendente} rotuloCarregando="Salvando…">
+            Salvar dados
           </Botao>
         </div>
       </fieldset>
