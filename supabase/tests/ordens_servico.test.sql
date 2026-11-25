@@ -1,5 +1,5 @@
 begin;
-select plan(16);
+select plan(20);
 
 grant usage on schema testes to authenticated;
 grant execute on function testes.entrar_como(uuid), testes.sair() to authenticated;
@@ -96,6 +96,20 @@ select results_eq(
   $$update ordens_servico set laudo = 'Trocar tela' where numero = 1000 returning laudo$$,
   array['Trocar tela'],
   'Dono A atualiza OS da própria loja');
+
+select throws_ok(
+  $$update ordens_servico set numero = 9999 where numero = 1000$$,
+  '42501', null, 'Dono A não troca o número de uma OS');
+select throws_ok(
+  format($$update ordens_servico set loja_id = %L where numero = 1000$$,
+         (select id from ids where chave = 'loja_b')),
+  '42501', null, 'Dono A não troca a loja de uma OS');
+select is(
+  (select numero from ordens_servico where laudo = 'Trocar tela'),
+  1000, 'O número da OS segue o original após as tentativas de troca');
+select lives_ok(
+  $$update ordens_servico set observacao = 'Cliente avisado' where numero = 1000$$,
+  'Dono A ainda atualiza colunas comuns da OS');
 
 -- Dono B ----------------------------------------------------------------
 select testes.entrar_como((select id from ids where chave = 'dono_b'));
