@@ -134,6 +134,18 @@ describe('abrirOS', () => {
     expect(cadeias(supabase, 'ordens_servico')[1].delete).toHaveBeenCalled()
   })
 
+  it('se apagar a OS também falha, avisa que ela pode ter ficado incompleta', async () => {
+    const supabase = clienteFalso({
+      ordens_servico: [osCriada, { error: { message: 'timeout', code: '57014' } }],
+      os_checklist: [{ error: { message: 'x', code: '23505' } }],
+    })
+    const r = await abrirOSCom(deps({ supabase }), nova)
+    expect(r).toEqual({
+      ok: false,
+      erro: 'A OS pode ter sido criada sem o checklist ou a senha. Confira a lista de OS antes de abrir outra.',
+    })
+  })
+
   it('erro do banco ao criar a OS vira mensagem genérica e nada mais é gravado', async () => {
     const supabase = clienteFalso({ ordens_servico: [{ data: null, error: { message: 'duplicate key', code: '23505' } }] })
     const r = await abrirOSCom(deps({ supabase }), { ...nova, senhaAparelho: '1234' })
@@ -204,16 +216,31 @@ describe('mudarStatus', () => {
     const [leitura] = cadeias(supabase, 'ordens_servico')
     expect(leitura.eq).toHaveBeenCalledWith('loja_id', 'L1')
     expect(supabase.rpc).toHaveBeenCalledTimes(1)
-    expect(supabase.rpc).toHaveBeenCalledWith('mudar_status_os', { os: 'OS1', para: 'em_analise', observacao: 'chegou' })
+    expect(supabase.rpc).toHaveBeenCalledWith('mudar_status_os', { os: 'OS1', de: 'aberta', para: 'em_analise', observacao: 'chegou' })
     // status e histórico NÃO são gravados por chamadas soltas: só pela função transacional
     expect(cadeias(supabase, 'os_historico')).toHaveLength(0)
     expect(leitura.update).not.toHaveBeenCalled()
   })
 
+  it('passa o status contra o qual validou (o dono voltando etapa vale para o status lido)', async () => {
+    const supabase = clienteFalso({ ordens_servico: [lerStatus('em_servico')] })
+    await mudarStatusCom(deps({ supabase, perfil: 'dono' }), 'OS1', 'aprovado')
+    expect(supabase.rpc).toHaveBeenCalledWith('mudar_status_os', { os: 'OS1', de: 'em_servico', para: 'aprovado', observacao: null })
+  })
+
+  it('etapa mudou no meio do caminho: a mensagem do banco chega à tela', async () => {
+    const msg = 'A etapa mudou enquanto você olhava. Recarregue a tela e tente de novo.'
+    const supabase = clienteFalso(
+      { ordens_servico: [lerStatus('aberta')] },
+      { mudar_status_os: [{ error: { message: msg, code: 'P0001' } }] },
+    )
+    expect(await mudarStatusCom(deps({ supabase }), 'OS1', 'em_analise')).toEqual({ ok: false, erro: msg })
+  })
+
   it('observação em branco vai como nula', async () => {
     const supabase = clienteFalso({ ordens_servico: [lerStatus('aberta')] })
     await mudarStatusCom(deps({ supabase }), 'OS1', 'em_analise', '   ')
-    expect(supabase.rpc).toHaveBeenCalledWith('mudar_status_os', { os: 'OS1', para: 'em_analise', observacao: null })
+    expect(supabase.rpc).toHaveBeenCalledWith('mudar_status_os', { os: 'OS1', de: 'aberta', para: 'em_analise', observacao: null })
   })
 
   it('falha do banco: erro genérico, sem vazar a mensagem crua', async () => {
@@ -297,6 +324,24 @@ describe('leitura', () => {
     const os = await carregarOSCom({ supabase: supabase as unknown as SupabaseClient }, 'OS1')
     expect(supabase.rpc).toHaveBeenCalledWith('senha_aparelho', { os: 'OS1' })
     expect(os?.senhaAparelho).toBe('1234')
+  })
+
+  it('o histórico traz o nome de quem mudou, e um rótulo neutro quando não há membro', async () => {
+    const supabase = clienteFalso({
+      ordens_servico: [linhaOS('em_servico')],
+      os_historico: [
+        {
+          data: [
+            { de_status: null, para_status: 'aberta', membro_id: null, observacao: null, criado_em: '2026-11-25T10:00' },
+            { de_status: 'aprovado', para_status: 'em_servico', membro_id: 'M1', observacao: null, criado_em: '2026-11-25T11:00' },
+          ],
+          error: null,
+        },
+      ],
+      membros: [{ data: [{ id: 'M1', nome: 'Ana' }], error: null }],
+    })
+    const os = await carregarOSCom({ supabase: supabase as unknown as SupabaseClient }, 'OS1')
+    expect(os?.historico.map((h) => h.membroNome)).toEqual(['Não identificado', 'Ana'])
   })
 
   it('OS encerrada não busca a senha', async () => {

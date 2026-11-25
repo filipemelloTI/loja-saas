@@ -69,6 +69,9 @@ insert into os_checklist (os_id, loja_id, nome, marcado, observacao) values
   ((select id from ids where chave = 'os_b1'), (select id from ids where chave = 'loja_b'),
    'Carga B', true, null);
 
+-- O gatilho já gravou a abertura de cada OS (coberto em mudar_status_os.test.sql);
+-- aqui parte-se de um histórico limpo para isolar o que este arquivo testa.
+delete from os_historico;
 insert into os_historico (os_id, loja_id, de_status, para_status, membro_id) values
   ((select id from ids where chave = 'os_a2'), (select id from ids where chave = 'loja_a'),
    'aberta', 'em_analise', (select id from ids where chave = 'membro_a'));

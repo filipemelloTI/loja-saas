@@ -28,6 +28,8 @@ export type ResultadoAbrirOS = { ok: true; id: string; numero: number } | { ok: 
 const ACESSO_NEGADO = { ok: false, erro: 'Acesso negado' } as const
 const NAO_ENCONTRADA = { ok: false, erro: 'OS não encontrada' } as const
 const OK = { ok: true } as const
+const OS_INCOMPLETA = 'A OS pode ter sido criada sem o checklist ou a senha. Confira a lista de OS antes de abrir outra.'
+export const MEMBRO_NAO_IDENTIFICADO = 'Não identificado'
 
 const vazioViraNulo = (v?: string) => (v ? v : null)
 
@@ -66,8 +68,8 @@ export async function abrirOSCom(deps: Dependencias, dados: DadosNovaOS): Promis
   const id = data.id as string
 
   const desfazer = async (erro: string): Promise<ResultadoAbrirOS> => {
-    await deps.supabase.from('ordens_servico').delete().eq('id', id).eq('loja_id', membro.lojaId)
-    return { ok: false, erro }
+    const { error: naoApagou } = await deps.supabase.from('ordens_servico').delete().eq('id', id).eq('loja_id', membro.lojaId)
+    return { ok: false, erro: naoApagou ? OS_INCOMPLETA : erro }
   }
 
   if (v.checklist?.length) {
@@ -114,11 +116,13 @@ export async function mudarStatusCom(
   if (error) return erroDoBanco(error)
   if (!data) return NAO_ENCONTRADA
 
-  const pode = podeMudar(data.status as StatusOS, para, membro.perfil)
+  const de = data.status as StatusOS
+  const pode = podeMudar(de, para, membro.perfil)
   if (!pode.ok) return pode
 
   const { error: falha } = await deps.supabase.rpc('mudar_status_os', {
     os: osId,
+    de, // o status contra o qual podeMudar validou: se mudou nesse meio tempo, o banco recusa
     para,
     observacao: vazioViraNulo(observacao?.trim()),
   })
@@ -179,7 +183,15 @@ export type OSCompleta = {
   encerradaEm: string | null
   criadoEm: string
   checklist: { nome: string; marcado: boolean; observacao: string | null }[]
-  historico: { deStatus: StatusOS | null; paraStatus: StatusOS; membroId: string | null; observacao: string | null; criadoEm: string }[]
+  historico: {
+    deStatus: StatusOS | null
+    paraStatus: StatusOS
+    membroId: string | null
+    /** Nome de quem mudou; rótulo neutro quando a linha não tem membro. */
+    membroNome: string
+    observacao: string | null
+    criadoEm: string
+  }[]
   /** Só vem preenchida quando a tela vai mostrá-la; a função do banco decide por perfil. */
   senhaAparelho: string | null
 }
@@ -244,6 +256,14 @@ export async function carregarOSCom(deps: Pick<Dependencias, 'supabase'>, id: st
     ehTerminal(status) ? Promise.resolve({ data: null }) : supabase.rpc('senha_aparelho', { os: id }),
   ])
 
+  const linhasHistorico = (historico.data ?? []) as Linha[]
+  const idsMembros = [...new Set(linhasHistorico.map((h) => h.membro_id as string | null).filter((m): m is string => !!m))]
+  const membros = new Map<string, string>()
+  if (idsMembros.length) {
+    const { data: ms } = await supabase.from('membros').select('id, nome').in('id', idsMembros)
+    for (const m of (ms ?? []) as { id: string; nome: string }[]) membros.set(m.id, m.nome)
+  }
+
   return {
     id: o.id as string,
     numero: o.numero as number,
@@ -269,10 +289,11 @@ export async function carregarOSCom(deps: Pick<Dependencias, 'supabase'>, id: st
       marcado: c.marcado as boolean,
       observacao: c.observacao as string | null,
     })),
-    historico: ((historico.data ?? []) as Linha[]).map((h) => ({
+    historico: linhasHistorico.map((h) => ({
       deStatus: h.de_status as StatusOS | null,
       paraStatus: h.para_status as StatusOS,
       membroId: h.membro_id as string | null,
+      membroNome: membros.get(h.membro_id as string) ?? MEMBRO_NAO_IDENTIFICADO,
       observacao: h.observacao as string | null,
       criadoEm: h.criado_em as string,
     })),
