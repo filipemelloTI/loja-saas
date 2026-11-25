@@ -7,6 +7,11 @@ const inicial = z.number({ message: 'Informe um número' }).int('Use um número 
 const dinheiro = z.number({ message: 'Informe um valor' }).min(0, 'Não pode ser negativo')
 const email = z.string().trim().min(1, 'Informe o e-mail').email('E-mail inválido')
 
+/** Campo opcional de formulário: vazio ou só espaços vira `undefined`, antes de validar. */
+const opcional = <T extends z.ZodType>(esquema: T) =>
+  z.preprocess((v) => (typeof v === 'string' && v.trim() === '' ? undefined : v), esquema.optional())
+const textoOpcional = opcional(z.string().trim())
+
 export const esquemaServico = z.object({
   nome: z.string().trim().min(1, 'Informe o nome').max(80, 'Máximo de 80 caracteres'),
   preco: dinheiro,
@@ -80,10 +85,10 @@ export function cpfValido(cpf: string): boolean {
 export const esquemaCliente = z.object({
   nome: z.string().trim().min(1, 'Informe o nome'),
   telefone: z.string().trim().min(1, 'Informe o telefone'),
-  cpf: z.string().refine(cpfValido, 'CPF inválido').optional(),
-  email: email.optional(),
-  endereco: z.string().optional(),
-  nascimento: z.iso.date('Data inválida').optional(),
+  cpf: opcional(z.string().refine(cpfValido, 'CPF inválido')),
+  email: opcional(email),
+  endereco: textoOpcional,
+  nascimento: opcional(z.iso.date('Data inválida')),
 })
 
 /** Mesmos valores do enum `public.tipo_aparelho` no banco (`relogio` sem acento). */
@@ -92,20 +97,20 @@ const aparelhoTipo = z.enum(['celular', 'tablet', 'relogio', 'notebook', 'outro'
 export const esquemaNovaOS = z
   .object({
     interna: z.boolean(),
-    clienteId: z.string().optional(),
+    clienteId: z.string().trim().optional(),
     aparelhoTipo,
-    marca: z.string().optional(),
-    modelo: z.string().optional(),
-    cor: z.string().optional(),
-    imei: z.string().optional(),
+    marca: textoOpcional,
+    modelo: textoOpcional,
+    cor: textoOpcional,
+    imei: textoOpcional,
     defeitoRelatado: z.string().trim().min(1, 'Descreva o defeito'),
     acessorios: z.array(z.string()).optional(),
     checklist: z
-      .array(z.object({ nome: z.string(), marcado: z.boolean(), observacao: z.string().optional() }))
+      .array(z.object({ nome: z.string().trim().min(1, 'Informe o nome do item'), marcado: z.boolean(), observacao: textoOpcional }))
       .optional(),
-    observacao: z.string().optional(),
+    observacao: textoOpcional,
     tecnicoId: z.string().optional(),
-    previsaoEntrega: z.iso.date('Data inválida').optional(),
+    previsaoEntrega: opcional(z.iso.date('Data inválida')),
     senhaAparelho: z.string().optional(),
   })
   .superRefine((v, ctx) => {

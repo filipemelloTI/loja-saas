@@ -113,6 +113,22 @@ describe('esquemaCliente', () => {
     })
     expect(r.success).toBe(true)
   })
+  it('campos opcionais em branco viram undefined', () => {
+    for (const vazio of ['', '   ']) {
+      const r = esquemaCliente.safeParse({ ...base, cpf: vazio, email: vazio, endereco: vazio, nascimento: vazio })
+      expect(r.success).toBe(true)
+      if (r.success) {
+        expect(r.data.cpf).toBeUndefined()
+        expect(r.data.email).toBeUndefined()
+        expect(r.data.endereco).toBeUndefined()
+        expect(r.data.nascimento).toBeUndefined()
+      }
+    }
+  })
+  it('endereço preenchido é aparado', () => {
+    const r = esquemaCliente.parse({ ...base, endereco: '  Rua A, 1  ' })
+    expect(r.endereco).toBe('Rua A, 1')
+  })
   it('recusa e-mail inválido quando informado', () => {
     const r = esquemaCliente.safeParse({ ...base, email: 'x' })
     expect(r.success).toBe(false)
@@ -132,6 +148,34 @@ describe('esquemaNovaOS', () => {
   })
   it('OS interna recusa cliente', () => {
     expect(motivo({ ...base, interna: true, clienteId: 'x' })).toEqual({ path: ['clienteId'], message: 'OS interna não tem cliente' })
+  })
+  it('cliente em branco ou só espaços conta como sem cliente', () => {
+    for (const clienteId of ['', '   ']) {
+      expect(motivo({ ...base, interna: false, clienteId })).toEqual({ path: ['clienteId'], message: 'Escolha o cliente' })
+      expect(esquemaNovaOS.safeParse({ ...base, interna: true, clienteId }).success).toBe(true)
+    }
+  })
+  it('campos opcionais em branco viram undefined', () => {
+    const r = esquemaNovaOS.safeParse({
+      ...base, interna: true, marca: '  ', modelo: '', cor: ' ', imei: '', observacao: '  ', previsaoEntrega: '',
+    })
+    expect(r.success).toBe(true)
+    if (r.success) {
+      expect([r.data.marca, r.data.modelo, r.data.cor, r.data.imei, r.data.observacao, r.data.previsaoEntrega]).toEqual(Array(6).fill(undefined))
+    }
+  })
+  it('apara marca preenchida', () => {
+    expect(esquemaNovaOS.parse({ ...base, interna: true, marca: '  Apple ' }).marca).toBe('Apple')
+  })
+  it('item de checklist sem nome é recusado', () => {
+    for (const nome of ['', '  ']) {
+      const r = esquemaNovaOS.safeParse({ ...base, interna: true, checklist: [{ nome, marcado: true }] })
+      expect(r.success).toBe(false)
+      if (!r.success) {
+        expect(r.error.issues[0].path).toEqual(['checklist', 0, 'nome'])
+        expect(r.error.issues[0].message).toBe('Informe o nome do item')
+      }
+    }
   })
   it('aceita OS normal com cliente e OS interna sem cliente', () => {
     expect(esquemaNovaOS.safeParse({ ...base, interna: false, clienteId: 'c1' }).success).toBe(true)
