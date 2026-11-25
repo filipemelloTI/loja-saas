@@ -325,7 +325,17 @@ function SecaoCliente({
 }
 
 /** Laudo do técnico: texto livre, salvo à parte para não depender de mudar a etapa. */
-export function FormularioLaudo({ osId, laudo, somenteLeitura }: { osId: string; laudo: string | null; somenteLeitura: boolean }) {
+export function FormularioLaudo({
+  osId,
+  laudo,
+  somenteLeitura,
+  encerrada,
+}: {
+  osId: string
+  laudo: string | null
+  somenteLeitura: boolean
+  encerrada: boolean
+}) {
   const [msg, setMsg] = useState<Msg>(null)
   const [pendente, iniciar] = useTransition()
 
@@ -346,11 +356,16 @@ export function FormularioLaudo({ osId, laudo, somenteLeitura }: { osId: string;
 
   return (
     <form onSubmit={enviar} onChange={() => setMsg(null)}>
-      <fieldset disabled={somenteLeitura} className="flex flex-col gap-3">
+      {encerrada && (
+        <p id="os-laudo-encerrada" className="mb-3 text-tinta-suave">
+          OS encerrada: o laudo não pode mais ser alterado.
+        </p>
+      )}
+      <fieldset disabled={somenteLeitura || encerrada} className="flex flex-col gap-3">
         <legend className="sr-only">Laudo da OS</legend>
         <div className="flex flex-col gap-1.5">
           <Rotulo htmlFor="os-laudo">Laudo do técnico</Rotulo>
-          <textarea id="os-laudo" name="laudo" rows={5} defaultValue={laudo ?? ''} className={`${CAIXA} py-2`} />
+          <textarea id="os-laudo" name="laudo" rows={5} aria-describedby={encerrada ? 'os-laudo-encerrada' : undefined} defaultValue={laudo ?? ''} className={`${CAIXA} py-2`} />
         </div>
         <Retorno msg={msg} />
         <div>

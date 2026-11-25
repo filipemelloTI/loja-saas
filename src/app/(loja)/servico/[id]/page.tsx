@@ -131,8 +131,7 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
       </Cartao>
 
       <Cartao titulo="Laudo">
-        {terminal && <p className="mb-3 text-tinta-suave">OS encerrada: o laudo não pode mais ser alterado.</p>}
-        <FormularioLaudo osId={os.id} laudo={os.laudo} somenteLeitura={somenteLeitura || terminal} />
+        <FormularioLaudo osId={os.id} laudo={os.laudo} somenteLeitura={somenteLeitura} encerrada={terminal} />
       </Cartao>
 
       {haSenhaParaMostrar && (
