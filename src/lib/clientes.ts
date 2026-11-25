@@ -36,6 +36,9 @@ const LIMITE_BUSCA = 50
 
 const vazioViraNulo = (v?: string) => (v ? v : null)
 
+/** Telefone e CPF são guardados só com dígitos, para a busca achar com ou sem máscara. */
+const soDigitos = (v: string) => v.replace(/\D/g, '')
+
 export async function salvarClienteCom(deps: Dependencias, dados: DadosCliente, id?: string): Promise<Resultado> {
   const lido = esquemaCliente.safeParse(dados)
   if (!lido.success) return { ok: false, erro: primeiroErro(lido.error) }
@@ -43,10 +46,12 @@ export async function salvarClienteCom(deps: Dependencias, dados: DadosCliente, 
   if (!membro) return ACESSO_NEGADO
 
   const v = lido.data
+  const telefone = soDigitos(v.telefone)
+  if (!telefone) return { ok: false, erro: 'Informe o telefone' }
   const linha = {
     nome: v.nome,
-    telefone: v.telefone,
-    cpf: vazioViraNulo(v.cpf),
+    telefone,
+    cpf: vazioViraNulo(v.cpf && soDigitos(v.cpf)),
     email: vazioViraNulo(v.email),
     endereco: vazioViraNulo(v.endereco),
     nascimento: vazioViraNulo(v.nascimento),
@@ -84,15 +89,28 @@ export async function buscarClientesCom(deps: Pick<Dependencias, 'supabase'>, te
   }
 
   const padrao = `%${escaparCuringas(limpo)}%`
-  const [nome, telefone, cpf, os] = await Promise.all([
-    clientes().ilike('nome', padrao).limit(LIMITE_BUSCA),
-    clientes().ilike('telefone', padrao).limit(LIMITE_BUSCA),
-    clientes().ilike('cpf', padrao).limit(LIMITE_BUSCA),
-    deps.supabase.from('ordens_servico').select('cliente_id').ilike('imei', padrao).not('cliente_id', 'is', null).limit(LIMITE_BUSCA),
+  // Telefone e CPF ficam só com dígitos no banco: busca pelos dígitos do termo, e sem dígitos nem consulta.
+  const digitos = soDigitos(limpo)
+  const padraoDigitos = `%${digitos}%`
+  const [nome, os, ...porDigitos] = await Promise.all([
+    clientes().ilike('nome', padrao).order('nome').limit(LIMITE_BUSCA),
+    deps.supabase
+      .from('ordens_servico')
+      .select('cliente_id')
+      .ilike('imei', padrao)
+      .not('cliente_id', 'is', null)
+      .order('criado_em', { ascending: false })
+      .limit(LIMITE_BUSCA),
+    ...(digitos
+      ? [
+          clientes().ilike('telefone', padraoDigitos).order('nome').limit(LIMITE_BUSCA),
+          clientes().ilike('cpf', padraoDigitos).order('nome').limit(LIMITE_BUSCA),
+        ]
+      : []),
   ])
   const ids = [...new Set(((os.data ?? []) as { cliente_id: string }[]).map((o) => o.cliente_id))]
   const porImei = ids.length && !os.error ? [await clientes().in('id', ids).limit(LIMITE_BUSCA)] : []
-  return resultadoDaBusca([nome, telefone, cpf, { data: null, error: os.error }, ...porImei])
+  return resultadoDaBusca([nome, ...porDigitos, { data: null, error: os.error }, ...porImei])
 }
 
 type RespostaBusca = { data: unknown; error: { code?: string } | null }
