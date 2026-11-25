@@ -53,6 +53,7 @@ const nova: DadosNovaOS = {
   ],
 }
 const osCriada: Resposta = { data: { id: 'OS1', numero: 7 }, error: null }
+const apagou: Resposta = { data: [{ id: 'OS1' }], error: null }
 
 describe('abrirOS', () => {
   it('dados inválidos param antes de tocar sessão e banco', async () => {
@@ -114,7 +115,7 @@ describe('abrirOS', () => {
 
   it('falha ao guardar a senha: erro genérico (sem a senha) e a OS recém-criada é apagada', async () => {
     const supabase = clienteFalso(
-      { ordens_servico: [osCriada] },
+      { ordens_servico: [osCriada, apagou] },
       { guardar_senha_aparelho: [{ error: { message: 'falhou com 1234', code: '42501' } }] },
     )
     const r = await abrirOSCom(deps({ supabase }), { ...nova, senhaAparelho: '1234' })
@@ -122,16 +123,40 @@ describe('abrirOS', () => {
     const apagar = cadeias(supabase, 'ordens_servico')[1]
     expect(apagar.delete).toHaveBeenCalled()
     expect(apagar.eq).toHaveBeenCalledWith('id', 'OS1')
+    expect(apagar.eq).toHaveBeenCalledWith('loja_id', 'L1')
   })
 
   it('falha no checklist: OS é apagada e o erro do banco vira mensagem genérica', async () => {
     const supabase = clienteFalso({
-      ordens_servico: [osCriada],
+      ordens_servico: [osCriada, apagou],
       os_checklist: [{ error: { message: 'violates constraint x', code: '23505' } }],
     })
     const r = await abrirOSCom(deps({ supabase }), nova)
     expect(r).toEqual({ ok: false, erro: FALHA_SALVAR })
-    expect(cadeias(supabase, 'ordens_servico')[1].delete).toHaveBeenCalled()
+    const apagar = cadeias(supabase, 'ordens_servico')[1]
+    expect(apagar.delete).toHaveBeenCalled()
+    expect(apagar.eq).toHaveBeenCalledWith('loja_id', 'L1')
+  })
+
+  it('falha no checklist com mensagem em português (P0001): a mensagem do passo que falhou é preservada', async () => {
+    const supabase = clienteFalso({
+      ordens_servico: [osCriada, apagou],
+      os_checklist: [{ error: { message: 'Item de checklist inválido', code: 'P0001' } }],
+    })
+    const r = await abrirOSCom(deps({ supabase }), nova)
+    expect(r).toEqual({ ok: false, erro: 'Item de checklist inválido' })
+  })
+
+  it('apagar a OS não acha linha alguma (zero linhas): avisa que pode ter ficado incompleta', async () => {
+    const supabase = clienteFalso({
+      ordens_servico: [osCriada, { data: [], error: null }],
+      os_checklist: [{ error: { message: 'x', code: '23505' } }],
+    })
+    const r = await abrirOSCom(deps({ supabase }), nova)
+    expect(r).toEqual({
+      ok: false,
+      erro: 'A OS pode ter sido criada sem o checklist ou a senha. Confira a lista de OS antes de abrir outra.',
+    })
   })
 
   it('se apagar a OS também falha, avisa que ela pode ter ficado incompleta', async () => {
@@ -321,7 +346,7 @@ describe('leitura', () => {
 
   it('a OS aberta busca a senha pela função, sem checar perfil no app', async () => {
     const supabase = clienteFalso({ ordens_servico: [linhaOS('em_servico')] }, { senha_aparelho: [{ data: '1234', error: null }] })
-    const os = await carregarOSCom({ supabase: supabase as unknown as SupabaseClient }, 'OS1')
+    const os = await carregarOSCom({ supabase: supabase as unknown as SupabaseClient, perfil: 'dono' }, 'OS1')
     expect(supabase.rpc).toHaveBeenCalledWith('senha_aparelho', { os: 'OS1' })
     expect(os?.senhaAparelho).toBe('1234')
   })
@@ -340,20 +365,42 @@ describe('leitura', () => {
       ],
       membros: [{ data: [{ id: 'M1', nome: 'Ana' }], error: null }],
     })
-    const os = await carregarOSCom({ supabase: supabase as unknown as SupabaseClient }, 'OS1')
+    const os = await carregarOSCom({ supabase: supabase as unknown as SupabaseClient, perfil: 'dono' }, 'OS1')
     expect(os?.historico.map((h) => h.membroNome)).toEqual(['Não identificado', 'Ana'])
+  })
+
+  it('atendente não pede a senha (nem gasta a ida ao banco)', async () => {
+    const supabase = clienteFalso({ ordens_servico: [linhaOS('em_servico')] })
+    const os = await carregarOSCom({ supabase: supabase as unknown as SupabaseClient, perfil: 'atendente' }, 'OS1')
+    expect(supabase.rpc).not.toHaveBeenCalled()
+    expect(os?.senhaAparelho).toBeNull()
+  })
+
+  it('técnico pede a senha', async () => {
+    const supabase = clienteFalso({ ordens_servico: [linhaOS('em_servico')] }, { senha_aparelho: [{ data: 'abc', error: null }] })
+    const os = await carregarOSCom({ supabase: supabase as unknown as SupabaseClient, perfil: 'tecnico' }, 'OS1')
+    expect(os?.senhaAparelho).toBe('abc')
+  })
+
+  it('a leitura da OS usa lista explícita de colunas, nunca *', async () => {
+    const supabase = clienteFalso({ ordens_servico: [linhaOS('aberta')] })
+    await carregarOSCom({ supabase: supabase as unknown as SupabaseClient, perfil: 'dono' }, 'OS1')
+    const [c] = cadeias(supabase, 'ordens_servico')
+    const colunas = c.select.mock.calls[0][0] as string
+    expect(colunas).not.toContain('*')
+    expect(colunas).toContain('defeito_relatado')
   })
 
   it('OS encerrada não busca a senha', async () => {
     const supabase = clienteFalso({ ordens_servico: [linhaOS('entregue')] })
-    const os = await carregarOSCom({ supabase: supabase as unknown as SupabaseClient }, 'OS1')
+    const os = await carregarOSCom({ supabase: supabase as unknown as SupabaseClient, perfil: 'dono' }, 'OS1')
     expect(supabase.rpc).not.toHaveBeenCalled()
     expect(os?.senhaAparelho).toBeNull()
   })
 
   it('OS que não aparece (outra loja) devolve null sem buscar a senha', async () => {
     const supabase = clienteFalso({ ordens_servico: [{ data: null, error: null }] })
-    expect(await carregarOSCom({ supabase: supabase as unknown as SupabaseClient }, 'OS1')).toBeNull()
+    expect(await carregarOSCom({ supabase: supabase as unknown as SupabaseClient, perfil: 'dono' }, 'OS1')).toBeNull()
     expect(supabase.rpc).not.toHaveBeenCalled()
   })
 })

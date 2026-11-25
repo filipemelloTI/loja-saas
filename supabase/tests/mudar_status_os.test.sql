@@ -1,5 +1,5 @@
 begin;
-select plan(20);
+select plan(23);
 
 grant usage on schema testes to authenticated;
 grant execute on function testes.entrar_como(uuid), testes.sair() to authenticated;
@@ -106,6 +106,31 @@ select is(
   array[null, 'aberta>em_analise', 'em_analise>aprovado']::text[],
   'recusa por etapa velha deixa o histórico intacto (abertura + 2 mudanças)');
 
+-- Update que não toca linha: nada de histórico mentiroso -------------------
+-- Estado forçado por um gatilho de teste que descarta o update (a OS passa
+-- pelo select for update, mas o update não afeta linha alguma).
+select testes.sair();
+create function public.teste_descarta_update() returns trigger
+language plpgsql as $$ begin return null; end; $$;
+create trigger teste_descarta_update before update on public.ordens_servico
+  for each row execute function public.teste_descarta_update();
+select testes.entrar_como((select id from ids where chave = 'dono_a'));
+select throws_ok(
+  format($$select mudar_status_os(%L, 'aprovado', 'em_servico')$$, (select id from ids where chave = 'os_a1')),
+  'P0001', 'Não foi possível mudar a etapa da OS.',
+  'update que não afeta linha é recusado, não registrado');
+select testes.sair();
+drop trigger teste_descarta_update on public.ordens_servico;
+select is(
+  (select status::text from ordens_servico where id = (select id from ids where chave = 'os_a1')),
+  'aprovado', 'update descartado deixa o status intacto');
+select is(
+  (select array_agg(de_status::text || '>' || para_status::text order by criado_em, para_status)
+   from os_historico where os_id = (select id from ids where chave = 'os_a1')),
+  array[null, 'aberta>em_analise', 'em_analise>aprovado']::text[],
+  'update descartado não deixa linha de histórico mentirosa');
+select testes.entrar_como((select id from ids where chave = 'dono_a'));
+
 -- Admin em suporte não escreve --------------------------------------------
 insert into acessos_suporte (loja_id, expira_em)
 values ((select id from ids where chave = 'loja_a'), now() + interval '24 hours');
@@ -119,7 +144,6 @@ select is(
   'aprovado', 'o status segue "aprovado" após a tentativa do suporte');
 
 -- Abertura registrada pelo gatilho -----------------------------------------
-select testes.sair();
 with o as (
   insert into ordens_servico (loja_id, interna, aparelho_tipo, defeito_relatado)
   values ((select id from ids where chave = 'loja_b'), true, 'celular', 'OS B1')

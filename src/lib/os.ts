@@ -68,8 +68,14 @@ export async function abrirOSCom(deps: Dependencias, dados: DadosNovaOS): Promis
   const id = data.id as string
 
   const desfazer = async (erro: string): Promise<ResultadoAbrirOS> => {
-    const { error: naoApagou } = await deps.supabase.from('ordens_servico').delete().eq('id', id).eq('loja_id', membro.lojaId)
-    return { ok: false, erro: naoApagou ? OS_INCOMPLETA : erro }
+    // Só vale como desfeito se o banco confirma a linha apagada; zero linhas é tão ruim quanto erro.
+    const { data: apagadas, error: naoApagou } = await deps.supabase
+      .from('ordens_servico')
+      .delete()
+      .eq('id', id)
+      .eq('loja_id', membro.lojaId)
+      .select('id')
+    return { ok: false, erro: naoApagou || !apagadas?.length ? OS_INCOMPLETA : erro }
   }
 
   if (v.checklist?.length) {
@@ -198,6 +204,12 @@ export type OSCompleta = {
 
 type Linha = Record<string, unknown>
 
+const COLUNAS_OS =
+  'id, numero, interna, cliente_id, aparelho_tipo, marca, modelo, cor, imei, defeito_relatado, acessorios, observacao, tecnico_id, laudo, previsao_entrega, status, encerrada_em, criado_em'
+
+/** Quem pode ver a senha do aparelho (a função do banco confere de novo; aqui só se poupa a ida à rede). */
+const PERFIS_COM_SENHA: Perfil[] = ['dono', 'tecnico']
+
 async function nomesDosClientes(supabase: SupabaseClient, ids: string[]): Promise<Map<string, string>> {
   if (!ids.length) return new Map()
   const { data } = await supabase.from('clientes').select('id, nome').in('id', ids)
@@ -236,11 +248,11 @@ export async function listarOSCom(deps: Pick<Dependencias, 'supabase'>, status?:
 
 /**
  * A OS completa para a tela de detalhe. A senha só é buscada aqui (nunca na lista) e só se a OS
- * ainda está aberta; quem pode vê-la a função `senha_aparelho` decide, então o perfil não é reconferido.
+ * ainda está aberta e o perfil é dono ou técnico; a função `senha_aparelho` confere o perfil de novo.
  */
-export async function carregarOSCom(deps: Pick<Dependencias, 'supabase'>, id: string): Promise<OSCompleta | null> {
+export async function carregarOSCom(deps: { supabase: SupabaseClient; perfil: Perfil }, id: string): Promise<OSCompleta | null> {
   const { supabase } = deps
-  const { data: os, error } = await supabase.from('ordens_servico').select('*').eq('id', id).maybeSingle()
+  const { data: os, error } = await supabase.from('ordens_servico').select(COLUNAS_OS).eq('id', id).maybeSingle()
   if (error || !os) return null
   const o = os as Linha
   const status = o.status as StatusOS
@@ -253,7 +265,9 @@ export async function carregarOSCom(deps: Pick<Dependencias, 'supabase'>, id: st
       .eq('os_id', id)
       .order('criado_em', { ascending: true }),
     nomesDosClientes(supabase, o.cliente_id ? [o.cliente_id as string] : []),
-    ehTerminal(status) ? Promise.resolve({ data: null }) : supabase.rpc('senha_aparelho', { os: id }),
+    ehTerminal(status) || !PERFIS_COM_SENHA.includes(deps.perfil)
+      ? Promise.resolve({ data: null })
+      : supabase.rpc('senha_aparelho', { os: id }),
   ])
 
   const linhasHistorico = (historico.data ?? []) as Linha[]

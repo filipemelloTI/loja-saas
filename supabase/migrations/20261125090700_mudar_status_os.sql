@@ -22,6 +22,7 @@ declare
   v_de public.status_os;
   v_loja uuid;
   v_membro uuid;
+  v_linhas bigint;
 begin
   -- FOR UPDATE: duas mudanças simultâneas se enfileiram, e o histórico de
   -- cada uma registra o status que ela de fato substituiu. Sob RLS, quem não
@@ -48,6 +49,13 @@ begin
   where m.user_id = auth.uid() and m.ativo and m.loja_id = v_loja;
 
   update ordens_servico set status = para where id = os;
+  -- O histórico só pode afirmar o que de fato aconteceu: se o update não
+  -- tocou linha alguma, nada é registrado. A garantia é local a esta função,
+  -- não depende de a política de update coincidir com a de leitura.
+  get diagnostics v_linhas = row_count;
+  if v_linhas = 0 then
+    raise exception 'Não foi possível mudar a etapa da OS.' using errcode = 'P0001';
+  end if;
 
   insert into os_historico (os_id, loja_id, de_status, para_status, membro_id, observacao)
   values (os, v_loja, v_de, para, v_membro, mudar_status_os.observacao);
