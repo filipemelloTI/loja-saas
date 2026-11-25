@@ -50,12 +50,17 @@ select col_is_unique('public', 'ordens_servico', array['loja_id', 'numero'],
   'unique (loja_id, numero) existe');
 
 -- Numeração -------------------------------------------------------------
+-- O cliente é pego pelo `loja_id` da loja_a, não por `limit 1`: um resíduo de
+-- outra loja (por exemplo, um e2e que deixa linhas no banco) violaria a FK composta
+-- `(cliente_id, loja_id) → clientes (id, loja_id)` com o cliente errado.
 insert into ordens_servico (loja_id, cliente_id, aparelho_tipo, defeito_relatado)
 values ((select id from ids where chave = 'loja_a'),
-        (select id from clientes limit 1), 'celular', 'Tela quebrada');
+        (select id from clientes where loja_id = (select id from ids where chave = 'loja_a') limit 1),
+        'celular', 'Tela quebrada');
 insert into ordens_servico (loja_id, cliente_id, aparelho_tipo, defeito_relatado)
 values ((select id from ids where chave = 'loja_a'),
-        (select id from clientes limit 1), 'tablet', 'Não carrega');
+        (select id from clientes where loja_id = (select id from ids where chave = 'loja_a') limit 1),
+        'tablet', 'Não carrega');
 insert into ordens_servico (loja_id, interna, aparelho_tipo, defeito_relatado)
 values ((select id from ids where chave = 'loja_b'), true, 'celular', 'Estoque');
 insert into ordens_servico (loja_id, interna, aparelho_tipo, defeito_relatado)
@@ -95,7 +100,8 @@ delete from ordens_servico where numero = 1003
 select throws_ok(
   format($$insert into ordens_servico (loja_id, interna, cliente_id, aparelho_tipo, defeito_relatado)
            values (%L, true, %L, 'celular', 'x')$$,
-         (select id from ids where chave = 'loja_a'), (select id from clientes limit 1)),
+         (select id from ids where chave = 'loja_a'),
+         (select id from clientes where loja_id = (select id from ids where chave = 'loja_a') limit 1)),
   '23514', null, 'OS interna não pode ter cliente');
 select throws_ok(
   format($$insert into ordens_servico (loja_id, interna, aparelho_tipo, defeito_relatado)
