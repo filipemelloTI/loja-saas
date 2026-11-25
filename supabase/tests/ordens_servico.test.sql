@@ -1,5 +1,5 @@
 begin;
-select plan(23);
+select plan(22);
 
 grant usage on schema testes to authenticated;
 grant execute on function testes.entrar_como(uuid), testes.sair() to authenticated;
@@ -128,9 +128,8 @@ select is(
 select lives_ok(
   $$update ordens_servico set observacao = 'Cliente avisado' where numero = 1000$$,
   'Dono A ainda atualiza colunas comuns da OS');
-select ok(
-  (select atualizado_em > criado_em from ordens_servico where numero = 1000),
-  'atualizado_em avança quando a OS é atualizada');
+-- Sem assertion de atualizado_em: now() é fixo dentro da transação do pgTAP,
+-- então o avanço não é observável aqui. Não mude o gatilho para clock_timestamp().
 
 -- Dono B ----------------------------------------------------------------
 select testes.entrar_como((select id from ids where chave = 'dono_b'));
