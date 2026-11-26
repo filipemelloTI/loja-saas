@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Fechar o ciclo da OS: montar orçamento com itens do catálogo e peças (do estoque ou "a comprar"), registrar aprovação manual pelo atendente, cobrar sinal e saldo, baixar estoque na entrega, calcular comissão do técnico e lucro da OS, tudo congelado no momento da entrega.
+**Goal:** Fechar o ciclo da OS: montar orçamento com itens do catálogo e peças lançadas à mão (custo pendente até o Dono preencher), registrar aprovação manual pelo atendente, cobrar sinal e saldo, calcular comissão do técnico e lucro da OS, tudo congelado no momento da entrega.
 
-**Architecture:** Toda consistência (versão do orçamento, baixa de estoque, congelamento de comissão, soma de pagamentos) vive em funções SQL `security invoker` — o supabase-js não tem transações. O cliente da sessão chama RPC; o TS puro em `src/lib/` cuida de montagem, validação e tradução de erros. Telas seguem o design system em `DESIGN.md` (`.sobrancelha`, `.numeros`, `.realce`, `.vidro`), com `useFormStatus` para pending state.
+**Architecture:** Toda consistência (versão do orçamento, congelamento de comissão, soma de pagamentos) vive em funções SQL `security invoker` — o supabase-js não tem transações. O cliente da sessão chama RPC; o TS puro em `src/lib/` cuida de montagem, validação e tradução de erros. Telas seguem o design system em `DESIGN.md` (`.sobrancelha`, `.numeros`, `.realce`, `.vidro`), com `useFormStatus` para pending state.
 
 **Tech Stack:** Next.js 16 App Router, Server Actions, Supabase (Postgres + RLS + pgTAP), Zod, Vitest, Playwright, Tailwind 4.
 
@@ -13,10 +13,10 @@
 ## Global Constraints
 
 - **Aprovação do cliente nesta fase é manual pelo atendente**, não há link público; o botão "Aprovado" pede nome de quem aprovou e meio (balcão / telefone / WhatsApp fora do sistema) — vira observação de versão.
-- **Peça sem estoque:** o atendente pode aprovar o orçamento mesmo assim; a peça entra como "a comprar", custo fica pendente para o Dono preencher. A entrega **não** é bloqueada por peça a comprar.
+- **Peças lançadas à mão (decidido em 26/11):** o módulo Estoque ainda não existe e a spec 13.1 exige que o Serviço funcione sem ele. A peça entra com descrição, quantidade e preço cobrado; o custo fica em `os_pecas_custo`, que só o Dono lê e grava. Sem linha de custo = custo pendente. O orçamento pode ser aprovado com custo pendente; a **entrega** é barrada até o Dono preencher todos. Escolher a peça do estoque e dar baixa entra junto com o módulo Estoque.
 - **Congelamento na entrega:** no momento em que a OS vira `entregue`, o sistema grava custo total das peças, comissão calculada e lucro em colunas da OS; mudanças posteriores de % de comissão ou preço de peça **não** alteram OS já entregue.
 - **Comissão = % técnico × (total cobrado com desconto − custo das peças).** Lucro = total cobrado − custo peças − comissão. Dono vê, técnico vê só a própria se o Dono ligar (já em `comissoes_membro`).
-- **Baixa de estoque é na entrega**, não na aprovação. Peça aprovada que a loja tem no estoque só sai do estoque quando o aparelho sai.
+- **Sem baixa de estoque nesta fase** (não há estoque). Quando o módulo Estoque existir, a baixa será na entrega, não na aprovação.
 - **Formas de pagamento** vêm de `config_loja.formas_pagamento`; a OS pode combinar várias (Pix + crédito 2x, por exemplo).
 - **Sinal:** opcional na aprovação; abatido do saldo na entrega.
 - **Nova versão do orçamento:** editar orçamento aprovado cria nova versão, volta status para `orcamento_enviado` e descarta a aprovação anterior. Versões anteriores ficam no histórico.
@@ -26,9 +26,9 @@
 
 ## Review Focus
 
-- **Peça "a comprar" sem custo e OS entregue:** se o Dono esquecer de preencher o custo, a entrega calcularia lucro usando custo zero e inflaria comissão. Pinar em testes: a entrega **bloqueia** se há peça a comprar com custo pendente.
+- **Peça sem custo e OS entregue:** se o Dono esquecer de preencher o custo, a entrega calcularia lucro usando custo zero e inflaria comissão. Pinar em testes: a entrega **bloqueia** se há peça sem linha em `os_pecas_custo`.
 - **Mudança de orçamento aprovado por dois atendentes ao mesmo tempo:** a segunda edição deve criar versão 3, não sobrescrever a versão 2 do primeiro. Pinar com `de_versao` em `editar_orcamento_os` (optimistic concurrency, mesmo padrão de `mudar_status_os`).
-- **Entrega concorrente:** dois cliques em "Entregar" não podem baixar estoque duas vezes. Pinar com `for update` em `ordens_servico` dentro de `entregar_os` + checagem `encerrada_em is null`.
+- **Entrega concorrente:** dois cliques em "Entregar" não podem congelar os números duas vezes nem duplicar o histórico. Pinar com `for update` em `ordens_servico` dentro de `entregar_os` + checagem `encerrada_em is null`.
 - **Pagamento somado maior que o total:** se atendente digita Pix 300 + crédito 400 numa OS de 650, o sistema aceita ou corrige? Pinar: aceita até `total`, recusa acima com mensagem clara.
 - **Técnico trocado antes da entrega:** se a OS troca de técnico entre aprovação e entrega, qual % vale? Pinar: a % vigente **no técnico que está no momento da entrega**, congelada ali.
 
@@ -38,15 +38,15 @@
 
 **Novo em `supabase/migrations/`:**
 - `20261126090100_orcamentos.sql` — tabelas `os_orcamentos`, `os_orcamento_itens`, `os_orcamento_versoes`; RLS; triggers de versão.
-- `20261126090200_os_pecas.sql` — tabela `os_pecas` (peças da OS, do estoque ou a comprar), FK para `estoque_itens` opcional; RLS.
+- `20261126090200_os_pecas.sql` — tabelas `os_pecas` (peça lançada à mão) e `os_pecas_custo` (só Dono); RLS.
 - `20261126090300_os_pagamentos.sql` — tabela `os_pagamentos` (linha por forma de pagamento usada); RLS.
 - `20261126090400_aprovar_recusar.sql` — RPCs `aprovar_orcamento_os`, `recusar_orcamento_os`, `editar_orcamento_os` (cria nova versão).
-- `20261126090500_entregar_os.sql` — RPC `entregar_os` (congela custos + comissão + baixa estoque + grava pagamento final).
+- `20261126090500_entregar_os.sql` — RPC `entregar_os` (congela custo das peças, comissão e lucro).
 - `20261126090600_colunas_encerramento.sql` — adiciona em `ordens_servico`: `custo_pecas_congelado`, `comissao_congelada`, `lucro_congelado`, `tecnico_congelado_id`.
 
 **Novo em `src/lib/`:**
 - `orcamento.ts` — montagem, cálculo de total/comissão/lucro, validação de pagamentos.
-- `pecas.ts` — regras de peça do estoque vs a comprar.
+- `pecas.ts` — regras de peça lançada à mão e custo pendente.
 - `pagamento.ts` — soma de formas, validação de sinal.
 
 **Novo em `src/app/(loja)/servico/[id]/`:**
@@ -146,51 +146,16 @@ git commit -m "feat(orcamento): tabelas os_orcamentos e os_orcamento_itens"
 
 ---
 
-## Task 2 — Peças da OS
+## Task 2 — Peças da OS (lançadas à mão)
 
 **Files:**
 - Create: `supabase/migrations/20261126090200_os_pecas.sql`
 - Test: `supabase/tests/os_pecas.test.sql`
 
 **Interfaces:**
-- Consumes: `os_orcamentos` da Task 1.
-- Produces: `public.os_pecas` com coluna `origem` (`estoque` | `a_comprar`), `estoque_item_id` opcional, `custo_unitario` nullable (pendente quando `origem = a_comprar`).
+- Produces: `public.os_pecas` (descrição, quantidade, preço cobrado; os três perfis leem e escrevem) e `public.os_pecas_custo` (`peca_id` PK, `custo_unitario`; só Dono, apagada em cascata com a peça, auditada). Peça sem linha de custo = custo pendente.
 
-- [ ] **Step 1: Teste pgTAP** — assertions: RLS ligada; peça `estoque` exige `estoque_item_id`; peça `a_comprar` proíbe `estoque_item_id`; `custo_unitario` pode ser null só se `origem = a_comprar`; insert com loja_id de outra loja na FK falha.
-
-- [ ] **Step 2: Ver falhar.** `npx supabase test db`.
-
-- [ ] **Step 3: Migração.**
-
-```sql
-create type public.origem_peca as enum ('estoque', 'a_comprar');
-
-create table public.os_pecas (
-  id uuid primary key default gen_random_uuid(),
-  loja_id uuid not null references public.lojas(id),
-  os_id uuid not null,
-  descricao text not null,
-  origem public.origem_peca not null,
-  estoque_item_id uuid,
-  quantidade int not null default 1 check (quantidade > 0),
-  preco_unitario numeric(10,2) not null check (preco_unitario >= 0),
-  custo_unitario numeric(10,2) check (custo_unitario is null or custo_unitario >= 0),
-  baixada_em timestamptz,   -- preenchido só na entrega
-  criado_em timestamptz not null default now(),
-  foreign key (os_id, loja_id) references public.ordens_servico(id, loja_id),
-  constraint peca_coerente check (
-    (origem = 'estoque' and estoque_item_id is not null)
-    or (origem = 'a_comprar' and estoque_item_id is null)),
-  constraint custo_coerente check (
-    custo_unitario is not null or origem = 'a_comprar')
-);
-```
-
-RLS como Task 1.
-
-- [ ] **Step 4: Ver passar.**
-
-- [ ] **Step 5: Commit** — `feat(pecas): tabela os_pecas com origem estoque ou a_comprar`.
+- [x] Feita: migração e teste (15 asserts) commitados.
 
 ---
 
@@ -326,8 +291,8 @@ Alter table + trigger `proteger_congelados` que levanta `42501` se `current_user
 **Interfaces:**
 - Produces: `entregar_os(os uuid, de_status status_os) returns void`. Dentro, em uma transação com `for update of o`:
   1. Confere status atual == `de` (optimistic).
-  2. Confere que não há peça `a_comprar` com `custo_unitario is null` → se há, levanta `P0001` com "Preencha o custo de todas as peças a comprar antes de entregar.".
-  3. Baixa estoque de cada peça `estoque = estoque - quantidade` e seta `baixada_em = now()` na peça.
+  2. Confere que toda peça da OS tem linha em `os_pecas_custo` → se falta alguma, levanta `P0001` com "Preencha o custo de todas as peças antes de entregar.". Como `os_pecas_custo` só é visível ao Dono, a RPC roda `security definer` (com checagem explícita de `minha_loja()` e `not em_suporte()`) para que atendente e técnico também consigam entregar sem ver o custo.
+  3. (Sem baixa de estoque nesta fase.)
   4. Calcula `custo_pecas = sum(custo_unitario * quantidade)` de todas as peças.
   5. Busca `% comissao` do técnico atual (`membros.comissao_percentual`).
   6. Calcula `total` da OS a partir de `os_orcamentos` aprovado + itens; `comissao = %  × (total - custo_pecas)`; `lucro = total - custo_pecas - comissao`.
@@ -337,7 +302,7 @@ Alter table + trigger `proteger_congelados` que levanta `42501` se `current_user
 
 **Simplificação para Fase B:** não cria tabela de comissões pendentes nesta fase — a comissão congelada em `ordens_servico.comissao_congelada` já serve para o relatório. Pagamento efetivo da comissão fica para Fase posterior.
 
-- [ ] **Step 1: Teste pgTAP** — happy path; bloqueio por peça a comprar sem custo; duplo-clique: segunda chamada com `de_status=pronto` levanta "A etapa mudou"; baixa de estoque faz `estoque_itens.quantidade` diminuir; concorrência duas sessões.
+- [ ] **Step 1: Teste pgTAP** — happy path (exemplo da spec: 650 cobrado, peça 280, 30% → comissão 111, lucro 259); bloqueio por peça sem custo; atendente entrega sem conseguir ler custo; duplo-clique: segunda chamada com `de_status=pronto` levanta "A etapa mudou"; outra loja não entrega.
 
 - [ ] **Step 2: Ver falhar.**
 
@@ -345,7 +310,7 @@ Alter table + trigger `proteger_congelados` que levanta `42501` se `current_user
 
 - [ ] **Step 4: Ver passar.**
 
-- [ ] **Step 5: Commit** — `feat(os): entregar_os congela custos, comissão e baixa estoque`.
+- [ ] **Step 5: Commit** — `feat(os): entregar_os congela custo das peças, comissão e lucro`.
 
 ---
 
@@ -385,19 +350,19 @@ Alter table + trigger `proteger_congelados` que levanta `42501` se `current_user
 
 **Interfaces:**
 - Consumes: Task 2.
-- Produces: ao escolher peça do estoque, mostra "no estoque: 3"; ao marcar "a comprar", mostra "custo pendente — Dono preenche depois"; só Dono vê e preenche `custo_unitario`.
+- Produces: lista de peças com descrição, quantidade e preço; peça sem custo mostra "custo pendente" para o Dono (e um aviso discreto "custo a cargo do Dono" para os outros); só o Dono vê e preenche o custo.
 
-- [ ] **Step 1: Teste controller + Zod** — escolher peça do estoque preenche custo automático; peça a comprar deixa custo null; técnico/atendente não pode mandar `custo_unitario` (middleware descarta); Dono pode.
+- [ ] **Step 1: Teste controller + Zod** — lançar peça com descrição/quantidade/preço; técnico/atendente não conseguem mandar custo (a action ignora o campo e o banco recusa); Dono grava custo.
 
 - [ ] **Step 2: Ver falhar.**
 
 - [ ] **Step 3: Implementar.**
 
-- [ ] **Step 4: Playwright** — adicionar peça do estoque, adicionar peça a comprar, trocar para Dono, preencher custo, voltar para atendente, custo some do form mas aparece como leitura.
+- [ ] **Step 4: Playwright** — atendente lança peça, não vê campo de custo; entra o Dono, vê "custo pendente", preenche; volta o atendente, continua sem ver o valor.
 
 - [ ] **Step 5: Ver passar.**
 
-- [ ] **Step 6: Commit** — `feat(pecas): tela de peças com estoque e peça a comprar`.
+- [ ] **Step 6: Commit** — `feat(pecas): tela de peças com custo só para o Dono`.
 
 ---
 
@@ -435,7 +400,7 @@ Alter table + trigger `proteger_congelados` que levanta `42501` se `current_user
 - Consumes: Task 7.
 - Produces: botão "Entregar" só aparece em `pronto`; pede confirmação com saldo final; bloco "Lucro: R$ 259" só se `meuPerfil = 'dono'` e OS entregue.
 
-- [ ] **Step 1: Playwright** — fluxo inteiro: abrir OS → montar orçamento → aprovar → adicionar peça do estoque → marcar pronto → pagar saldo → entregar → aparece lucro só para o Dono.
+- [ ] **Step 1: Playwright** — fluxo inteiro: abrir OS → montar orçamento → aprovar → lançar peça → Dono preenche custo → marcar pronto → pagar saldo → entregar → aparece lucro só para o Dono.
 
 - [ ] **Step 2: Ver falhar.**
 
