@@ -1,6 +1,7 @@
 import 'server-only'
 import { carregarOSCom, listarOSCom, type OSCompleta, type ResumoOS } from '@/lib/os'
 import { carregarOrcamentoCom, type DadosOrcamento } from '@/lib/orcamento-acoes'
+import { carregarPecasCom, type DadosPecas } from '@/lib/pecas-acoes'
 import type { StatusOS } from '@/lib/os-status'
 import { perfilEfetivo } from '@/lib/guarda'
 import { exigirArea } from '@/lib/sessao'
@@ -28,6 +29,13 @@ export async function carregarOS(id: string): Promise<{ os: OSCompleta | null; s
 export async function carregarOrcamento(osId: string): Promise<DadosOrcamento> {
   const { supabase } = await base()
   return carregarOrcamentoCom(supabase, osId)
+}
+
+/** Peças da OS; o custo só vem para o Dono, os outros recebem só quantas estão sem custo. */
+export async function carregarPecas(osId: string): Promise<DadosPecas & { podeVerCusto: boolean }> {
+  const { supabase, perfil, somenteLeitura } = await base()
+  const podeVerCusto = perfil === 'dono' && !somenteLeitura
+  return { ...(await carregarPecasCom(supabase, osId, podeVerCusto ? 'dono' : 'atendente')), podeVerCusto }
 }
 
 export type ServicoCatalogo = { id: string; nome: string; preco: number }

@@ -14,6 +14,7 @@ import {
   type DadosDesconto,
   type DadosItem,
 } from '@/lib/orcamento-acoes'
+import { adicionarPecaCom, removerPecaCom, salvarCustoPecaCom, type DadosPeca } from '@/lib/pecas-acoes'
 import type { Resultado } from '@/lib/resultado'
 import type { StatusOS } from '@/lib/os-status'
 import { exigirArea } from '@/lib/sessao'
@@ -97,4 +98,18 @@ export async function recusarOrcamento(orcamentoId: string) {
 
 export async function novaVersaoOrcamento(orcamentoId: string) {
   return comRefresh(novaVersaoCom(await dependencias(), orcamentoId))
+}
+
+// Peças ----------------------------------------------------------------------
+
+export async function adicionarPeca(osId: string, dados: DadosPeca) {
+  return comRefresh(adicionarPecaCom(await dependencias(), osId, dados))
+}
+
+export async function removerPeca(pecaId: string) {
+  return comRefresh(removerPecaCom(await dependencias(), pecaId))
+}
+
+export async function salvarCustoPeca(pecaId: string, custoUnitario: number) {
+  return comRefresh(salvarCustoPecaCom(await dependencias(), pecaId, custoUnitario))
 }

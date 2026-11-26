@@ -130,6 +130,14 @@ export const esquemaItemOrcamento = z.object({
   servicoId: opcional(z.string().uuid('Serviço inválido')),
 })
 
+export const esquemaPeca = z.object({
+  descricao: z.string().trim().min(1, 'Descreva a peça').max(120, 'Máximo de 120 caracteres'),
+  quantidade: z.number({ message: 'Informe a quantidade' }).int('Use um número inteiro').min(1, 'Mínimo 1').max(999, 'Máximo 999'),
+  precoUnitario: dinheiro,
+})
+
+export const esquemaCustoPeca = z.object({ custoUnitario: dinheiro })
+
 export const esquemaDesconto = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('nenhum') }),
   z.object({ tipo: z.literal('valor'), valor: dinheiro }),

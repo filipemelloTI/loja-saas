@@ -333,6 +333,8 @@ create trigger validar_forma before insert on public.os_pagamentos
 
 - [ ] **Step 6: Commit** — `feat(pecas): tela de peças com custo só para o Dono`.
 
+**Feita (26/11).** Regras em `src/lib/pecas-acoes.ts` (11 testes Vitest); bloco `_componentes/pecas.tsx` no detalhe da OS. Nova função `pecas_sem_custo(os)` (migração `20261126090900`, 4 testes pgTAP): técnico e atendente veem só **quantas** peças esperam custo ("1 peça aguarda o custo do Dono. A entrega só sai depois disso."), nunca o valor. O Dono vê "Custo pendente" e grava ou corrige o custo por peça. Com orçamento enviado ou aprovado, o bloco explica que a mudança vai pelo "Alterar orçamento". Testado no navegador como Dono e como atendente. Playwright fica para a Task 11.
+
 ---
 
 ## Task 10 — Tela e Server Actions de pagamento
