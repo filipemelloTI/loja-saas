@@ -234,17 +234,9 @@ create trigger validar_forma before insert on public.os_pagamentos
 - Test: `tests/unit/orcamento.test.ts`
 
 **Interfaces:**
-- Produces: `calcularTotalOrcamento({ itens, pecas, descontoValor?, descontoPercentual? }): { subtotal, desconto, total }`, `calcularComissao({ total, custoPecas, percentual }): number`, `calcularLucro({ total, custoPecas, comissao }): number`.
+- Produces: `calcularTotalOrcamento({ itens, pecas, descontoValor?, descontoPercentual? }): { subtotal, desconto, total }`, `somarCustoPecas(pecas: { quantidade, custoUnitario: number | null }[]): number | null` (`null` = alguma peça com custo pendente), `calcularComissao({ total, custoPecas, percentual }): number` (nunca negativa), `calcularLucro({ total, custoPecas, comissao }): number`. Tipos `Linha` e `LinhaCusto`.
 
-- [ ] **Step 1: Teste Vitest** — exemplo da spec (650 cobrado, peça 280, 30%) dá base 370, comissão 111, lucro 259. Desconto em valor. Desconto em percentual. Peça a_comprar com custo null → `custoPecas` trata como 0 **e** `calcularLucro` retorna `{ lucro: null, pendencia: 'peca_sem_custo' }` para forçar a UI a avisar.
-
-- [ ] **Step 2: Ver falhar.** `npx vitest run orcamento`.
-
-- [ ] **Step 3: Implementar.** Três funções puras. Zero I/O.
-
-- [ ] **Step 4: Ver passar.**
-
-- [ ] **Step 5: Commit** — `feat(orcamento): cálculo de total, comissão e lucro em TS puro`.
+- [x] Feita (15 testes). Contas em centavos inteiros. Desconto maior que o subtotal zera o total; os dois descontos juntos lançam erro. A pendência de custo é sinalizada por `somarCustoPecas` devolver `null`, não por `calcularLucro`.
 
 ---
 
