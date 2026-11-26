@@ -2,6 +2,19 @@
 
 import { refresh } from 'next/cache'
 import { abrirOSCom, mudarStatusCom, salvarLaudoCom, type DadosNovaOS, type Dependencias } from '@/lib/os'
+import {
+  adicionarItemCom,
+  aprovarOrcamentoCom,
+  enviarOrcamentoCom,
+  novaVersaoCom,
+  recusarOrcamentoCom,
+  removerItemCom,
+  salvarDescontoCom,
+  type DadosAprovacao,
+  type DadosDesconto,
+  type DadosItem,
+} from '@/lib/orcamento-acoes'
+import type { Resultado } from '@/lib/resultado'
 import type { StatusOS } from '@/lib/os-status'
 import { exigirArea } from '@/lib/sessao'
 import { criarClienteServidor } from '@/lib/supabase/servidor'
@@ -48,4 +61,40 @@ export async function salvarLaudo(osId: string, laudo: string) {
   const r = await salvarLaudoCom(await dependencias(), osId, laudo)
   if (r.ok) refresh()
   return r
+}
+
+// Orçamento ------------------------------------------------------------------
+
+async function comRefresh(r: Promise<Resultado>) {
+  const resultado = await r
+  if (resultado.ok) refresh()
+  return resultado
+}
+
+export async function adicionarItemOrcamento(osId: string, dados: DadosItem) {
+  return comRefresh(adicionarItemCom(await dependencias(), osId, dados))
+}
+
+export async function removerItemOrcamento(itemId: string) {
+  return comRefresh(removerItemCom(await dependencias(), itemId))
+}
+
+export async function salvarDescontoOrcamento(orcamentoId: string, dados: DadosDesconto) {
+  return comRefresh(salvarDescontoCom(await dependencias(), orcamentoId, dados))
+}
+
+export async function enviarOrcamento(orcamentoId: string) {
+  return comRefresh(enviarOrcamentoCom(await dependencias(), orcamentoId))
+}
+
+export async function aprovarOrcamento(orcamentoId: string, dados: DadosAprovacao) {
+  return comRefresh(aprovarOrcamentoCom(await dependencias(), orcamentoId, dados))
+}
+
+export async function recusarOrcamento(orcamentoId: string) {
+  return comRefresh(recusarOrcamentoCom(await dependencias(), orcamentoId))
+}
+
+export async function novaVersaoOrcamento(orcamentoId: string) {
+  return comRefresh(novaVersaoCom(await dependencias(), orcamentoId))
 }

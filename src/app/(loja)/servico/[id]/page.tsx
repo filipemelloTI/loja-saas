@@ -12,9 +12,10 @@ import { avancosDe, ehTerminal, podeMudar, ROTULO_STATUS, type StatusOS } from '
 import { ROTULO_APARELHO } from '@/lib/rotulos'
 import { contextoAtual } from '@/lib/sessao'
 import { FormularioLaudo } from '../_componentes/formulario'
+import { OrcamentoDaOS } from '../_componentes/orcamento'
 import { SenhaDoAparelho } from '../_componentes/senha'
 import { AcoesStatus } from '../_componentes/status'
-import { carregarOS, nomeDoTecnicoDaOS } from '../dados'
+import { carregarOrcamento, carregarOS, listarServicosDaLoja, nomeDoTecnicoDaOS } from '../dados'
 
 export const metadata: Metadata = { title: 'Ordem de serviço' }
 
@@ -41,7 +42,12 @@ export default function PaginaOS({ params }: PageProps<'/servico/[id]'>) {
 
 async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params'] }) {
   const { id } = await params
-  const [{ os, somenteLeitura }, ctx] = await Promise.all([carregarOS(id), contextoAtual()])
+  const [{ os, somenteLeitura }, ctx, orcamento, servicos] = await Promise.all([
+    carregarOS(id),
+    contextoAtual(),
+    carregarOrcamento(id),
+    listarServicosDaLoja(),
+  ])
   if (!os) notFound()
 
   const perfil = ctx ? perfilEfetivo(ctx) : null
@@ -117,6 +123,18 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
               </li>
             ))}
           </ul>
+        </Cartao>
+      )}
+
+      {(!os.interna || orcamento.atual) && (
+        <Cartao etiqueta="Para o cliente" titulo="Orçamento">
+          <OrcamentoDaOS
+            key={orcamento.atual?.id ?? 'novo'}
+            osId={os.id}
+            dados={orcamento}
+            servicos={servicos}
+            bloqueado={somenteLeitura || terminal}
+          />
         </Cartao>
       )}
 

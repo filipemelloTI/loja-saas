@@ -305,6 +305,9 @@ create trigger validar_forma before insert on public.os_pagamentos
 
 - [ ] **Step 7: Commit** — `feat(orcamento): tela de orçamento com aprovar, recusar e editar`.
 
+**Feita (26/11).** Regras em `src/lib/orcamento-acoes.ts` (18 testes Vitest com cliente falso); bloco `_componentes/orcamento.tsx` no detalhe da OS (escondido em OS interna sem orçamento). O primeiro item cria a versão 1 sozinho. "Enviar" virou **"Marcar como enviado"** (o sistema ainda não manda nada ao cliente). Recusar e criar nova versão pedem confirmação na própria tela. Testado no navegador (lançar do catálogo e avulso, desconto 10% → R$ 315,90, enviar, aprovar por telefone, versão 2), no celular e no tema escuro. **O Playwright do orçamento fica para o fluxo completo da Task 11**, que já precisa reescrever o E2E da Fase A.
+- **Ponto aberto:** o bloco "Etapa" ainda oferece "Orçamento enviado" e "Aprovado" à mão, contornando o orçamento. A entrega exige orçamento aprovado, então não dá para fechar a OS assim, mas confunde. Avaliar na Task 11 se esses botões somem quando a OS é de cliente.
+
 ---
 
 ## Task 9 — Tela e Server Actions de peças

@@ -1,5 +1,6 @@
 import 'server-only'
 import { carregarOSCom, listarOSCom, type OSCompleta, type ResumoOS } from '@/lib/os'
+import { carregarOrcamentoCom, type DadosOrcamento } from '@/lib/orcamento-acoes'
 import type { StatusOS } from '@/lib/os-status'
 import { perfilEfetivo } from '@/lib/guarda'
 import { exigirArea } from '@/lib/sessao'
@@ -21,6 +22,25 @@ export async function listarOS(status?: StatusOS): Promise<{ ordens: ResumoOS[];
 export async function carregarOS(id: string): Promise<{ os: OSCompleta | null; somenteLeitura: boolean }> {
   const { supabase, somenteLeitura, perfil } = await base()
   return { os: await carregarOSCom({ supabase, perfil }, id), somenteLeitura }
+}
+
+/** Orçamento da OS (versão atual, anteriores) e as peças que entram no total. Nunca traz custo. */
+export async function carregarOrcamento(osId: string): Promise<DadosOrcamento> {
+  const { supabase } = await base()
+  return carregarOrcamentoCom(supabase, osId)
+}
+
+export type ServicoCatalogo = { id: string; nome: string; preco: number }
+
+/** Serviços ativos do catálogo da loja, para preencher o item do orçamento. O custo fica de fora. */
+export async function listarServicosDaLoja(): Promise<ServicoCatalogo[]> {
+  const { supabase } = await base()
+  const { data } = await supabase.from('servicos').select('id, nome, preco').eq('ativo', true).order('nome')
+  return ((data ?? []) as { id: string; nome: string; preco: unknown }[]).map((s) => ({
+    id: s.id,
+    nome: s.nome,
+    preco: Number(s.preco),
+  }))
 }
 
 export type ItemChecklist = { id: string; nome: string }
