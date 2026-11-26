@@ -40,8 +40,8 @@
 - `20261126090100_orcamentos.sql` — tabelas `os_orcamentos`, `os_orcamento_itens`, `os_orcamento_versoes`; RLS; triggers de versão.
 - `20261126090200_os_pecas.sql` — tabelas `os_pecas` (peça lançada à mão) e `os_pecas_custo` (só Dono); RLS.
 - `20261126090300_os_pagamentos.sql` — tabela `os_pagamentos` (linha por forma de pagamento usada); RLS.
-- `20261126090400_aprovar_recusar.sql` — RPCs `aprovar_orcamento_os`, `recusar_orcamento_os`, `editar_orcamento_os` (cria nova versão).
-- `20261126090500_entregar_os.sql` — RPC `entregar_os` (congela custo das peças, comissão e lucro).
+- `20261126090700_aprovar_recusar.sql` — RPCs `aprovar_orcamento_os`, `recusar_orcamento_os`, `editar_orcamento_os` (cria nova versão).
+- `20261126090800_entregar_os.sql` — RPC `entregar_os` (congela custo das peças, comissão e lucro).
 - `20261126090600_colunas_encerramento.sql` — adiciona em `ordens_servico`: `custo_pecas_congelado`, `comissao_congelada`, `lucro_congelado`, `tecnico_congelado_id`.
 
 **Novo em `src/lib/`:**
@@ -218,22 +218,12 @@ create trigger validar_forma before insert on public.os_pagamentos
 
 **Files:**
 - Create: `supabase/migrations/20261126090600_colunas_encerramento.sql`
-- Test: estender `supabase/tests/ordens_servico.test.sql` com asserts das novas colunas.
+- Test: `supabase/tests/os_congelados.test.sql`
 
 **Interfaces:**
-- Produces: `ordens_servico.custo_pecas_congelado numeric(10,2)`, `comissao_congelada numeric(10,2)`, `lucro_congelado numeric(10,2)`, `tecnico_congelado_id uuid`, `comissao_percentual_congelado numeric(5,2)`. Tudo `null` até a entrega.
+- Produces: `ordens_servico.total_congelado`, `custo_pecas_congelado`, `comissao_percentual_congelado`, `comissao_congelada`, `lucro_congelado`, `tecnico_congelado_id`. Tudo `null` até a entrega.
 
-- [ ] **Step 1: Teste** — assert `col_exists` para cada; assert `before update` não deixa authenticated mexer nessas colunas (gatilho novo `proteger_congelados`).
-
-- [ ] **Step 2: Ver falhar.**
-
-- [ ] **Step 3: Migração.**
-
-Alter table + trigger `proteger_congelados` que levanta `42501` se `current_user in ('authenticated','anon')` tenta setar qualquer uma. Só a RPC `entregar_os` (que roda `security invoker` mas chamada em contexto de sessão) consegue — vamos fazer o gatilho ignorar quando `current_setting('app.entregando_os', true) = '1'` e a RPC `set local` isso dentro da sua transação.
-
-- [ ] **Step 4: Ver passar.**
-
-- [ ] **Step 5: Commit** — `feat(os): colunas congeladas de custo/comissão/lucro na entrega`.
+- [x] Feita. Gatilhos `proteger_congelados_os` (update) e `os_nasce_sem_congelados` (insert) barram `authenticated`/`anon` com `42501`, no padrão de `proteger_numero_os`. **Desvio do plano original:** nada de variável de sessão `app.entregando_os` como chave — qualquer usuário logado consegue defini-la. Só grava quem roda com privilégio de servidor, ou seja, a `entregar_os` (`security definer`).
 
 ---
 
@@ -261,7 +251,7 @@ Alter table + trigger `proteger_congelados` que levanta `42501` se `current_user
 ## Task 6 — RPC aprovar/recusar/editar orçamento
 
 **Files:**
-- Create: `supabase/migrations/20261126090400_aprovar_recusar.sql`
+- Create: `supabase/migrations/20261126090700_aprovar_recusar.sql`
 - Test: `supabase/tests/aprovar_recusar.test.sql`
 
 **Interfaces:**
@@ -285,7 +275,7 @@ Alter table + trigger `proteger_congelados` que levanta `42501` se `current_user
 ## Task 7 — RPC entregar_os (coração da Fase B)
 
 **Files:**
-- Create: `supabase/migrations/20261126090500_entregar_os.sql`
+- Create: `supabase/migrations/20261126090800_entregar_os.sql`
 - Test: `supabase/tests/entregar_os.test.sql`
 
 **Interfaces:**
@@ -294,11 +284,11 @@ Alter table + trigger `proteger_congelados` que levanta `42501` se `current_user
   2. Confere que toda peça da OS tem linha em `os_pecas_custo` → se falta alguma, levanta `P0001` com "Preencha o custo de todas as peças antes de entregar.". Como `os_pecas_custo` só é visível ao Dono, a RPC roda `security definer` (com checagem explícita de `minha_loja()` e `not em_suporte()`) para que atendente e técnico também consigam entregar sem ver o custo.
   3. (Sem baixa de estoque nesta fase.)
   4. Calcula `custo_pecas = sum(custo_unitario * quantidade)` de todas as peças.
-  5. Busca `% comissao` do técnico atual (`membros.comissao_percentual`).
-  6. Calcula `total` da OS a partir de `os_orcamentos` aprovado + itens; `comissao = %  × (total - custo_pecas)`; `lucro = total - custo_pecas - comissao`.
-  7. `set local app.entregando_os = '1'`; `update ordens_servico set status = 'entregue', encerrada_em = now(), custo_pecas_congelado = …, comissao_congelada = …, lucro_congelado = …, tecnico_congelado_id = …, comissao_percentual_congelado = …`.
+  5. Busca a % do técnico atual em `comissoes_membro.percentual` (sem linha = 0). Se o técnico é Dono e `config_loja.dono_gera_comissao = false`, a % é 0.
+  6. Calcula `total` = itens do orçamento aprovado + preço das peças − desconto (mesma conta de `calcularTotalOrcamento`, Task 5); `comissao = % × (total − custo_pecas)`, nunca negativa; `lucro = total − custo_pecas − comissao`. Arredondar a 2 casas.
+  7. `update ordens_servico set status = 'entregue', encerrada_em = now(), total_congelado = …, custo_pecas_congelado = …, comissao_percentual_congelado = …, comissao_congelada = …, lucro_congelado = …, tecnico_congelado_id = …` (a função é `security definer`, então os gatilhos da Task 4 deixam passar).
   8. Insere linha em `os_historico` com `para_status = 'entregue'`.
-  9. Insere linha em `comissoes_pendentes` (nova tabela — pode ficar em `20261126090700_comissoes_pendentes.sql` como Task 7.5 ou aqui mesmo).
+  9. **Também nesta task:** `mudar_status_os` passa a recusar `para = 'entregue'` com "Use o botão Entregar para encerrar a OS." — senão dá para entregar sem congelar nada.
 
 **Simplificação para Fase B:** não cria tabela de comissões pendentes nesta fase — a comissão congelada em `ordens_servico.comissao_congelada` já serve para o relatório. Pagamento efetivo da comissão fica para Fase posterior.
 
