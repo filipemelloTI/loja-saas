@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { montarLinkDefinirSenha } from '@/lib/auth-links'
 import { validarModulos } from '@/lib/permissoes'
+import { primeiroErro, type Resultado } from '@/lib/resultado'
 import { esquemaNovaLoja } from '@/lib/validacoes'
 import type { Situacao } from '@/lib/rotulos'
 import type { Modulo } from '@/lib/tipos'
@@ -22,7 +23,9 @@ export type Dependencias = {
   lojaEmSuporte: () => Promise<string | null>
 }
 
-export type Resultado = { ok: true } | { ok: false; erro: string }
+// `Resultado` vem de `@/lib/resultado`, reexportado para quem importa daqui.
+// `ResultadoLink` é só desta camada (traz o link de definir senha).
+export type { Resultado }
 export type ResultadoLink = { ok: true; linkDefinirSenha: string } | { ok: false; erro: string }
 
 const SITUACOES: Situacao[] = ['em_dia', 'atrasado', 'suspensa']
@@ -39,10 +42,6 @@ function traduzir(erro: NonNullable<ErroBanco>, padrao: string): string {
   if (erro.code === 'P0001') return erro.message
   if (erro.code === '23514' && erro.message.includes('vendas_exige_estoque')) return 'Vendas exige o módulo Estoque'
   return padrao
-}
-
-function primeiroErro(e: z.ZodError) {
-  return e.issues[0]?.message ?? 'Dados inválidos'
 }
 
 async function gerarLink(admin: SupabaseClient, origem: string, email: string): Promise<string | null> {
