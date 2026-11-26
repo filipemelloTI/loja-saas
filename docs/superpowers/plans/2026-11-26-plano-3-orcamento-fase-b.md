@@ -265,28 +265,18 @@ create trigger validar_forma before insert on public.os_pagamentos
 - Test: `supabase/tests/entregar_os.test.sql`
 
 **Interfaces:**
-- Produces: `entregar_os(os uuid, de_status status_os) returns void`. Dentro, em uma transação com `for update of o`:
-  1. Confere status atual == `de` (optimistic).
-  2. Confere que toda peça da OS tem linha em `os_pecas_custo` → se falta alguma, levanta `P0001` com "Preencha o custo de todas as peças antes de entregar.". Como `os_pecas_custo` só é visível ao Dono, a RPC roda `security definer` (com checagem explícita de `minha_loja()` e `not em_suporte()`) para que atendente e técnico também consigam entregar sem ver o custo.
-  3. (Sem baixa de estoque nesta fase.)
-  4. Calcula `custo_pecas = sum(custo_unitario * quantidade)` de todas as peças.
-  5. Busca a % do técnico atual em `comissoes_membro.percentual` (sem linha = 0). Se o técnico é Dono e `config_loja.dono_gera_comissao = false`, a % é 0.
-  6. Calcula `total` = itens do orçamento aprovado + preço das peças − desconto (mesma conta de `calcularTotalOrcamento`, Task 5); `comissao = % × (total − custo_pecas)`, nunca negativa; `lucro = total − custo_pecas − comissao`. Arredondar a 2 casas.
-  7. `update ordens_servico set status = 'entregue', encerrada_em = now(), total_congelado = …, custo_pecas_congelado = …, comissao_percentual_congelado = …, comissao_congelada = …, lucro_congelado = …, tecnico_congelado_id = …` (a função é `security definer`, então os gatilhos da Task 4 deixam passar).
-  8. Insere linha em `os_historico` com `para_status = 'entregue'`.
-  9. **Também nesta task:** `mudar_status_os` passa a recusar `para = 'entregue'` com "Use o botão Entregar para encerrar a OS." — senão dá para entregar sem congelar nada.
+- Produces: `entregar_os(os uuid) returns void`, `security definer` (atendente e técnico entregam sem ler `os_pecas_custo`), loja conferida à mão. Em uma transação, com a OS travada:
+  1. Etapa: encerrada → "A OS já foi encerrada." (é o que o segundo clique recebe); fora de `pronto` → "A OS só pode ser entregue quando estiver pronta.".
+  2. OS de cliente sem orçamento aprovado → "A OS não tem orçamento aprovado.". OS interna dispensa orçamento.
+  3. Peça sem custo → "O Dono precisa preencher o custo de todas as peças antes da entrega.".
+  4. Total = itens do orçamento aprovado + preço das peças − desconto (mesma conta de `src/lib/orcamento.ts`). % do técnico em `comissoes_membro` (0 sem linha; 0 se o técnico é Dono e `dono_gera_comissao = false`). Comissão nunca negativa.
+  5. **Pagamento completo (decisão de 26/11):** pago < total → "Falta receber R$ X antes de entregar."; pago > total → "Os pagamentos passam do total da OS. Corrija antes de entregar.".
+  6. Muda o status por `mudar_status_os` (histórico; o gatilho da Fase A carimba `encerrada_em` e apaga a senha) e grava as colunas congeladas.
+  - `mudar_status_os` passou a recusar `para = 'entregue'` vindo de usuário logado: "Use o botão Entregar para encerrar a OS.".
+  - Sem tabela de comissões pendentes nesta fase: `comissao_congelada` já serve ao relatório.
 
-**Simplificação para Fase B:** não cria tabela de comissões pendentes nesta fase — a comissão congelada em `ordens_servico.comissao_congelada` já serve para o relatório. Pagamento efetivo da comissão fica para Fase posterior.
-
-- [ ] **Step 1: Teste pgTAP** — happy path (exemplo da spec: 650 cobrado, peça 280, 30% → comissão 111, lucro 259); bloqueio por peça sem custo; atendente entrega sem conseguir ler custo; duplo-clique: segunda chamada com `de_status=pronto` levanta "A etapa mudou"; outra loja não entrega.
-
-- [ ] **Step 2: Ver falhar.**
-
-- [ ] **Step 3: Migração.**
-
-- [ ] **Step 4: Ver passar.**
-
-- [ ] **Step 5: Commit** — `feat(os): entregar_os congela custo das peças, comissão e lucro`.
+- [x] Feita (20 testes, exemplo da spec confere).
+- **Pendência para a Task 11:** o E2E `tests/e2e/servico.spec.ts` da Fase A avança até `entregue` pelos botões de etapa, que agora são recusados. A Task 11 troca esse passo pelo botão Entregar e tira `entregue` dos botões de etapa da tela.
 
 ---
 
