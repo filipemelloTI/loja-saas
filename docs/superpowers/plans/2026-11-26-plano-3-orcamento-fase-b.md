@@ -247,20 +247,14 @@ create trigger validar_forma before insert on public.os_pagamentos
 - Test: `supabase/tests/aprovar_recusar.test.sql`
 
 **Interfaces:**
-- Produces: três funções SQL:
-  - `aprovar_orcamento_os(orc uuid, de_versao int, por text, meio text) returns void` — optimistic concurrency em `versao`; muda status da OS para `aprovado` (chamando internamente `mudar_status_os`).
-  - `recusar_orcamento_os(orc uuid, de_versao int) returns void` — muda status da OS para `recusado`.
-  - `editar_orcamento_os(orc uuid, de_versao int) returns int` — marca versão atual como `substituido`, cria versão nova em `rascunho` com os mesmos itens, retorna nova versão. Se status atual era `aprovado`, também avança a OS de volta para `orcamento_enviado`.
+- Produces (todas `security definer`, conferindo `minha_loja()`, `loja_liberada()` e `not em_suporte()` à mão; erro `P0001` em português):
+  - `enviar_orcamento_os(orc uuid) returns void` — rascunho → enviado; OS `em_analise` → `orcamento_enviado` (OS `aberta` recebe "Coloque a OS em análise antes de enviar o orçamento.").
+  - `aprovar_orcamento_os(orc uuid, por text, meio text) returns void` — de rascunho ou enviado; `meio` em `balcao | telefone | whatsapp | outro`; OS `aberta | em_analise | orcamento_enviado` → `aprovado` (atalho do balcão incluso).
+  - `recusar_orcamento_os(orc uuid) returns void` — só de enviado; OS `orcamento_enviado` → `recusado`.
+  - `editar_orcamento_os(orc uuid) returns uuid` — de enviado ou aprovado: a versão vira `substituido`, nasce a próxima em rascunho com itens e desconto copiados; devolve o id novo. Se a OS já tinha passado de `orcamento_enviado`, volta para lá com observação "Orçamento alterado (versão N): precisa de nova aprovação".
+  - Concorrência: a função confere o status atual do orçamento (sem `de_versao`); segundo clique recebe "O orçamento mudou enquanto você olhava. Recarregue a tela e tente de novo.".
 
-- [ ] **Step 1: Teste pgTAP** — happy paths de cada RPC; concorrência: duas edições com `de_versao=1` → segunda levanta `P0001` com "A etapa mudou"; recusar orçamento já recusado é no-op silencioso ou erro? → **erro** (igual `mudar_status_os`).
-
-- [ ] **Step 2: Ver falhar.**
-
-- [ ] **Step 3: Migração.** As três funções, `security invoker`, `set search_path = public, pg_temp`, `for update of o` na OS, lock em `os_orcamentos`.
-
-- [ ] **Step 4: Ver passar.**
-
-- [ ] **Step 5: Commit** — `feat(orcamento): RPCs aprovar, recusar e editar (nova versão)`.
+- [x] Feita (31 testes). Também nesta task: usuário logado só grava `loja_id, os_id, desconto_*` em `os_orcamentos` (privilégio por coluna); itens, desconto **e peças** travam quando o orçamento vigente está enviado ou aprovado ("crie uma nova versão"); item passou a ter vínculo composto `(orcamento_id, loja_id)` — o vínculo simples da Task 1 deixava a loja B pendurar item em orçamento da loja A.
 
 ---
 
