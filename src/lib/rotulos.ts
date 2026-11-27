@@ -45,3 +45,8 @@ export const FORMAS_PAGAMENTO = {
 } as const
 
 export type FormaPagamento = keyof typeof FORMAS_PAGAMENTO
+
+/** Rótulo de uma forma gravada; valor desconhecido aparece como veio, nunca quebra a tela. */
+export function rotuloForma(forma: string): string {
+  return (FORMAS_PAGAMENTO as Record<string, string>)[forma] ?? forma
+}

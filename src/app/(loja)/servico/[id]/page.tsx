@@ -13,10 +13,18 @@ import { ROTULO_APARELHO } from '@/lib/rotulos'
 import { contextoAtual } from '@/lib/sessao'
 import { FormularioLaudo } from '../_componentes/formulario'
 import { OrcamentoDaOS } from '../_componentes/orcamento'
+import { PagamentoDaOS } from '../_componentes/pagamento'
 import { PecasDaOS } from '../_componentes/pecas'
 import { SenhaDoAparelho } from '../_componentes/senha'
 import { AcoesStatus } from '../_componentes/status'
-import { carregarOrcamento, carregarOS, carregarPecas, listarServicosDaLoja, nomeDoTecnicoDaOS } from '../dados'
+import {
+  carregarOrcamento,
+  carregarOS,
+  carregarPagamento,
+  carregarPecas,
+  listarServicosDaLoja,
+  nomeDoTecnicoDaOS,
+} from '../dados'
 
 export const metadata: Metadata = { title: 'Ordem de serviço' }
 
@@ -43,12 +51,13 @@ export default function PaginaOS({ params }: PageProps<'/servico/[id]'>) {
 
 async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params'] }) {
   const { id } = await params
-  const [{ os, somenteLeitura }, ctx, orcamento, servicos, pecas] = await Promise.all([
+  const [{ os, somenteLeitura }, ctx, orcamento, servicos, pecas, pagamento] = await Promise.all([
     carregarOS(id),
     contextoAtual(),
     carregarOrcamento(id),
     listarServicosDaLoja(),
     carregarPecas(id),
+    carregarPagamento(id),
   ])
   if (!os) notFound()
 
@@ -149,6 +158,17 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
           bloqueado={somenteLeitura || terminal}
         />
       </Cartao>
+
+      {(!os.interna || pagamento.pagamentos.length > 0) && (
+        <Cartao etiqueta="Do cliente" titulo="Pagamento">
+          <PagamentoDaOS
+            osId={os.id}
+            dados={pagamento}
+            pronta={os.status === 'pronto'}
+            bloqueado={somenteLeitura || terminal}
+          />
+        </Cartao>
+      )}
 
       <Cartao etiqueta="Etapa" titulo={terminal ? 'OS encerrada' : 'Mudar a etapa'}>
         {terminal ? (

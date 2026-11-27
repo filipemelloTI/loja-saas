@@ -358,6 +358,8 @@ create trigger validar_forma before insert on public.os_pagamentos
 
 - [ ] **Step 5: Commit** — `feat(pagamento): registrar sinal e pagamento parcial com várias formas`.
 
+**Feita (26/11).** Regras em `src/lib/pagamento-acoes.ts` (9 testes Vitest); bloco `_componentes/pagamento.tsx` com Total · Pago · Falta. Antes de a OS ficar pronta entra como **sinal**; com ela pronta, como **pagamento** final (o valor já vem com o que falta). Soma acima do total é recusada: "O total pago não pode passar de R$ X. Falta R$ Y.". **Decisão de 26/11:** só o Dono apaga ou corrige pagamento, e OS encerrada não mexe em pagamento — garantido no banco (`20261126091000_pagamentos_travas.sql`, 6 testes pgTAP; um teste da Task 3 passou a corrigir como Dono). Rótulos das formas reaproveitam `FORMAS_PAGAMENTO` de `rotulos.ts`. Testado no navegador.
+
 ---
 
 ## Task 11 — Botão de entregar e bloco de lucro (só Dono)

@@ -2,6 +2,7 @@ import 'server-only'
 import { carregarOSCom, listarOSCom, type OSCompleta, type ResumoOS } from '@/lib/os'
 import { carregarOrcamentoCom, type DadosOrcamento } from '@/lib/orcamento-acoes'
 import { carregarPecasCom, type DadosPecas } from '@/lib/pecas-acoes'
+import { carregarPagamentosCom, totalDaOSCom, type Pagamento } from '@/lib/pagamento-acoes'
 import type { StatusOS } from '@/lib/os-status'
 import { perfilEfetivo } from '@/lib/guarda'
 import { exigirArea } from '@/lib/sessao'
@@ -36,6 +37,31 @@ export async function carregarPecas(osId: string): Promise<DadosPecas & { podeVe
   const { supabase, perfil, somenteLeitura } = await base()
   const podeVerCusto = perfil === 'dono' && !somenteLeitura
   return { ...(await carregarPecasCom(supabase, osId, podeVerCusto ? 'dono' : 'atendente')), podeVerCusto }
+}
+
+export type DadosPagamentoOS = {
+  pagamentos: Pagamento[]
+  /** Total cobrado hoje (orçamento atual + peças − desconto). */
+  total: number
+  /** Formas que a loja aceita, na ordem das Configurações. */
+  formas: string[]
+  podeRemover: boolean
+}
+
+/** Pagamentos da OS, o total a cobrar e as formas aceitas pela loja. */
+export async function carregarPagamento(osId: string): Promise<DadosPagamentoOS> {
+  const { supabase, perfil, somenteLeitura } = await base()
+  const [pagamentos, total, config] = await Promise.all([
+    carregarPagamentosCom(supabase, osId),
+    totalDaOSCom(supabase, osId),
+    supabase.from('config_loja').select('formas_pagamento').maybeSingle(),
+  ])
+  return {
+    pagamentos,
+    total,
+    formas: (config.data?.formas_pagamento as string[] | undefined) ?? [],
+    podeRemover: perfil === 'dono' && !somenteLeitura,
+  }
 }
 
 export type ServicoCatalogo = { id: string; nome: string; preco: number }

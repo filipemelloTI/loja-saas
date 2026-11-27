@@ -147,6 +147,19 @@ export const esquemaDesconto = z.discriminatedUnion('tipo', [
   }),
 ])
 
+export const esquemaPagamento = z
+  .object({
+    forma: z.string().trim().min(1, 'Escolha a forma de pagamento'),
+    parcelas: z.number({ message: 'Informe as parcelas' }).int('Use um número inteiro').min(1, 'Mínimo 1').max(24, 'Máximo 24').optional(),
+    valor: z.number({ message: 'Informe o valor' }).positive('O valor precisa ser maior que zero'),
+  })
+  .superRefine((p, ctx) => {
+    if (p.forma === 'credito' && p.parcelas === undefined)
+      ctx.addIssue({ code: 'custom', message: 'Informe em quantas parcelas', path: ['parcelas'] })
+    if (p.forma !== 'credito' && p.parcelas !== undefined)
+      ctx.addIssue({ code: 'custom', message: 'Parcelas só no crédito', path: ['parcelas'] })
+  })
+
 export const MEIOS_APROVACAO = ['balcao', 'telefone', 'whatsapp', 'outro'] as const
 
 export const esquemaAprovacao = z.object({

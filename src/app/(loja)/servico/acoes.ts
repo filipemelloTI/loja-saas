@@ -14,6 +14,7 @@ import {
   type DadosDesconto,
   type DadosItem,
 } from '@/lib/orcamento-acoes'
+import { registrarPagamentoCom, removerPagamentoCom, type DadosPagamento } from '@/lib/pagamento-acoes'
 import { adicionarPecaCom, removerPecaCom, salvarCustoPecaCom, type DadosPeca } from '@/lib/pecas-acoes'
 import type { Resultado } from '@/lib/resultado'
 import type { StatusOS } from '@/lib/os-status'
@@ -112,4 +113,14 @@ export async function removerPeca(pecaId: string) {
 
 export async function salvarCustoPeca(pecaId: string, custoUnitario: number) {
   return comRefresh(salvarCustoPecaCom(await dependencias(), pecaId, custoUnitario))
+}
+
+// Pagamento ------------------------------------------------------------------
+
+export async function registrarPagamento(osId: string, dados: DadosPagamento) {
+  return comRefresh(registrarPagamentoCom(await dependencias(), osId, dados))
+}
+
+export async function removerPagamento(pagamentoId: string) {
+  return comRefresh(removerPagamentoCom(await dependencias(), pagamentoId))
 }

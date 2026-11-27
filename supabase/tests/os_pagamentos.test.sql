@@ -86,14 +86,18 @@ select throws_ok(
            values (%L, %L, 'final', 'pix', 0)$$,
          (select id from ids where chave = 'loja_a'), (select id from ids where chave = 'os_a')),
   '23514', null, 'Valor zero é recusado');
+select is(
+  (select sum(valor) from os_pagamentos),
+  650.00::numeric, 'Atendente lê a soma dos pagamentos da OS');
+select testes.sair();
+
+-- Corrigir é do Dono (pagamentos_travas); mesmo ele não troca para forma inativa.
+select testes.entrar_como((select id from ids where chave = 'dono_a'));
 select throws_ok(
   format($$update os_pagamentos set forma = 'dinheiro' where os_id = %L and forma = 'pix'$$,
          (select id from ids where chave = 'os_a')),
   'P0001', 'Esta forma de pagamento não está ativa na loja.',
   'Correção para forma inativa também é recusada');
-select is(
-  (select sum(valor) from os_pagamentos),
-  650.00::numeric, 'Atendente lê a soma dos pagamentos da OS');
 select testes.sair();
 
 -- Auditoria registrou as duas inclusões ---------------------------------
