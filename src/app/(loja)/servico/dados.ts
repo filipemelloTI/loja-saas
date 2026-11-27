@@ -3,6 +3,7 @@ import { carregarOSCom, listarOSCom, type OSCompleta, type ResumoOS } from '@/li
 import { carregarOrcamentoCom, type DadosOrcamento } from '@/lib/orcamento-acoes'
 import { carregarPecasCom, type DadosPecas } from '@/lib/pecas-acoes'
 import { carregarPagamentosCom, totalDaOSCom, type Pagamento } from '@/lib/pagamento-acoes'
+import { carregarFechamentoCom, type Fechamento } from '@/lib/fechamento'
 import type { StatusOS } from '@/lib/os-status'
 import { perfilEfetivo } from '@/lib/guarda'
 import { exigirArea } from '@/lib/sessao'
@@ -62,6 +63,13 @@ export async function carregarPagamento(osId: string): Promise<DadosPagamentoOS>
     formas: (config.data?.formas_pagamento as string[] | undefined) ?? [],
     podeRemover: perfil === 'dono' && !somenteLeitura,
   }
+}
+
+/** Custo, comissão e lucro congelados na entrega. Só o Dono recebe; os outros, `null`. */
+export async function carregarFechamento(osId: string): Promise<Fechamento | null> {
+  const { supabase, perfil, somenteLeitura } = await base()
+  if (perfil !== 'dono' || somenteLeitura) return null
+  return carregarFechamentoCom(supabase, osId)
 }
 
 export type ServicoCatalogo = { id: string; nome: string; preco: number }

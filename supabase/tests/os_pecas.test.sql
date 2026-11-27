@@ -123,9 +123,9 @@ select is_empty(
 select testes.sair();
 
 -- Apagar a peça leva o custo junto ---------------------------------------
-delete from os_pecas where descricao = 'Tela iPhone 11';
+delete from os_pecas where descricao = 'Tela iPhone 11' and loja_id = (select id from ids where chave = 'loja_a');
 select is(
-  (select count(*)::int from os_pecas_custo),
+  (select count(*)::int from os_pecas_custo where loja_id = (select id from ids where chave = 'loja_a')),
   0, 'Apagar a peça apaga o custo dela');
 
 select * from finish();

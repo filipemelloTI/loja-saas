@@ -102,7 +102,8 @@ select testes.sair();
 
 -- Auditoria registrou as duas inclusões ---------------------------------
 select is(
-  (select count(*)::int from auditoria where tabela = 'os_pagamentos'),
+  (select count(*)::int from auditoria
+    where tabela = 'os_pagamentos' and loja_id = (select id from ids where chave = 'loja_a')),
   2, 'Cada pagamento incluído fica na auditoria');
 
 -- Outra loja -------------------------------------------------------------

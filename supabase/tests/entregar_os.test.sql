@@ -118,7 +118,8 @@ select throws_ok(
   'Pagamento acima do total barra a entrega');
 select testes.sair();
 
-update os_pagamentos set valor = 350 where forma = 'credito';
+update os_pagamentos set valor = 350
+ where forma = 'credito' and os_id = (select id from ids where chave = 'os_spec');
 
 -- Entrega do exemplo da spec ---------------------------------------------
 select testes.entrar_como((select id from ids where chave = 'atend_a'));
@@ -135,13 +136,13 @@ select is(
   (select status::text from ordens_servico where id = (select id from ids where chave = 'os_spec')),
   'entregue', 'A OS fica entregue');
 select is(
-  (select row(total_congelado, custo_pecas_congelado, comissao_percentual_congelado,
-              comissao_congelada, lucro_congelado)::text
-     from ordens_servico where id = (select id from ids where chave = 'os_spec')),
+  (select row(total, custo_pecas, comissao_percentual,
+              comissao, lucro)::text
+     from os_fechamento where os_id = (select id from ids where chave = 'os_spec')),
   '(650.00,280.00,30.00,111.00,259.00)',
   'Spec 8.5: cobrado 650, peça 280, 30% → comissão 111, sobrou 259');
 select is(
-  (select tecnico_congelado_id from ordens_servico where id = (select id from ids where chave = 'os_spec')),
+  (select tecnico_id from os_fechamento where os_id = (select id from ids where chave = 'os_spec')),
   (select id from ids where chave = 'm_tec'), 'O técnico da entrega fica gravado');
 select isnt(
   (select encerrada_em from ordens_servico where id = (select id from ids where chave = 'os_spec')),
@@ -155,7 +156,7 @@ select is(
 -- Mudar a % depois não mexe na OS entregue.
 update comissoes_membro set percentual = 50 where membro_id = (select id from ids where chave = 'm_tec');
 select is(
-  (select comissao_congelada from ordens_servico where id = (select id from ids where chave = 'os_spec')),
+  (select comissao from os_fechamento where os_id = (select id from ids where chave = 'os_spec')),
   111.00::numeric, 'Mudar a % depois não altera a comissão congelada');
 
 -- Dono como técnico, com desconto -----------------------------------------
@@ -165,9 +166,9 @@ select lives_ok(
   'Dono entrega a OS em que ele foi o técnico');
 select testes.sair();
 select is(
-  (select row(total_congelado, custo_pecas_congelado, comissao_percentual_congelado,
-              comissao_congelada, lucro_congelado)::text
-     from ordens_servico where id = (select id from ids where chave = 'os_dono')),
+  (select row(total, custo_pecas, comissao_percentual,
+              comissao, lucro)::text
+     from os_fechamento where os_id = (select id from ids where chave = 'os_dono')),
   '(90.00,0.00,0.00,0.00,90.00)',
   'Desconto de 10% aplicado; Dono como técnico não gera comissão');
 
@@ -178,8 +179,8 @@ select lives_ok(
   'OS interna é encerrada sem orçamento nem pagamento');
 select testes.sair();
 select is(
-  (select row(total_congelado, comissao_congelada, lucro_congelado)::text
-     from ordens_servico where id = (select id from ids where chave = 'os_interna')),
+  (select row(total, comissao, lucro)::text
+     from os_fechamento where os_id = (select id from ids where chave = 'os_interna')),
   '(0.00,0.00,0.00)', 'OS interna congela tudo em zero');
 
 -- Outra loja ---------------------------------------------------------------

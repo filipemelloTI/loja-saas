@@ -383,6 +383,13 @@ create trigger validar_forma before insert on public.os_pagamentos
 
 - [ ] **Step 5: Commit** — `feat(os): entregar OS congela números e revela lucro para o Dono`.
 
+**Feita (26/11).**
+- **Correção da Task 4:** os números congelados estavam em colunas de `ordens_servico`, que os três perfis leem (a API entregaria o lucro ao atendente). Foram para a tabela `os_fechamento` (só o Dono lê; só a `entregar_os` grava) — migração `20261126091100_fechamento_so_dono.sql`; `os_congelados.test.sql` virou `os_fechamento.test.sql` (8 testes).
+- Botões de etapa: "Entregue" saiu sempre; na OS de cliente saíram também "Orçamento enviado", "Aprovado" e "Recusado" (vêm do bloco Orçamento). Sem botão, aparece a dica de onde seguir. Fecha o ponto aberto da Task 8.
+- Bloco **Entrega** (OS pronta): lista o que falta e "Entregar aparelho" com confirmação. Bloco **Quanto sobrou** (só Dono, OS entregue).
+- `src/lib/fechamento.ts` (6 testes Vitest). E2E `servico.spec.ts` reescrito: em análise → item → peça → custo → aprovação no balcão → em serviço → pronto → pagamento → entrega → sobrou R$ 370,00.
+- Testes pgTAP que contavam linhas do banco inteiro passaram a filtrar pela loja do teste (dados do E2E e de teste manual quebravam a contagem).
+
 ---
 
 ## Task 12 — Pré-merge: checagens finais

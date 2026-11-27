@@ -6,6 +6,7 @@ import { AreaProtegida } from '@/components/AreaProtegida'
 import { Roda } from '@/components/ui/Botao'
 import { Cartao } from '@/components/ui/Cartao'
 import { Selo } from '@/components/ui/Selo'
+import { formatarReais } from '@/lib/dinheiro'
 import { formatarData, formatarDataHora, formatarDataISO } from '@/lib/formatar'
 import { perfilEfetivo } from '@/lib/guarda'
 import { avancosDe, ehTerminal, podeMudar, ROTULO_STATUS, type StatusOS } from '@/lib/os-status'
@@ -13,11 +14,13 @@ import { ROTULO_APARELHO } from '@/lib/rotulos'
 import { contextoAtual } from '@/lib/sessao'
 import { FormularioLaudo } from '../_componentes/formulario'
 import { OrcamentoDaOS } from '../_componentes/orcamento'
+import { EntregarOS } from '../_componentes/entregar'
 import { PagamentoDaOS } from '../_componentes/pagamento'
 import { PecasDaOS } from '../_componentes/pecas'
 import { SenhaDoAparelho } from '../_componentes/senha'
 import { AcoesStatus } from '../_componentes/status'
 import {
+  carregarFechamento,
   carregarOrcamento,
   carregarOS,
   carregarPagamento,
@@ -51,23 +54,37 @@ export default function PaginaOS({ params }: PageProps<'/servico/[id]'>) {
 
 async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params'] }) {
   const { id } = await params
-  const [{ os, somenteLeitura }, ctx, orcamento, servicos, pecas, pagamento] = await Promise.all([
+  const [{ os, somenteLeitura }, ctx, orcamento, servicos, pecas, pagamento, fechamento] = await Promise.all([
     carregarOS(id),
     contextoAtual(),
     carregarOrcamento(id),
     listarServicosDaLoja(),
     carregarPecas(id),
     carregarPagamento(id),
+    carregarFechamento(id),
   ])
   if (!os) notFound()
 
   const perfil = ctx ? perfilEfetivo(ctx) : null
   const status = ROTULO_STATUS[os.status]
   const terminal = ehTerminal(os.status)
-  const avancos = avancosDe(os.status)
+  // "Entregue" só pelo botão Entregar (congela os números). Na OS de cliente, enviar, aprovar e
+  // recusar saem do bloco Orçamento, que registra quem aprovou e trava os itens.
+  const peloOrcamento: StatusOS[] = os.interna ? [] : ['orcamento_enviado', 'aprovado', 'recusado']
+  const avancos = avancosDe(os.status).filter((s) => s !== 'entregue' && !peloOrcamento.includes(s))
+  const dicaEtapa =
+    os.status === 'pronto'
+      ? 'Para encerrar, use “Entregar aparelho” no bloco Entrega.'
+      : !os.interna && (os.status === 'em_analise' || os.status === 'aberta')
+        ? 'Com o orçamento pronto, marque como enviado ou registre a aprovação no bloco Orçamento.'
+        : os.status === 'orcamento_enviado'
+          ? 'Aguardando a resposta do cliente: registre no bloco Orçamento.'
+          : undefined
+  const pago = pagamento.pagamentos.reduce((t, p) => t + Math.round(p.valor * 100), 0)
+  const falta = Math.max(Math.round(pagamento.total * 100) - pago, 0) / 100
   // Voltar etapa não é avanço: sai do que `podeMudar` libera para este perfil (hoje, só o Dono).
   const voltas = (Object.keys(ROTULO_STATUS) as StatusOS[]).filter(
-    (s) => s !== os.status && !avancos.includes(s) && perfil !== null && podeMudar(os.status, s, perfil).ok,
+    (s) => s !== os.status && !avancosDe(os.status).includes(s) && perfil !== null && podeMudar(os.status, s, perfil).ok,
   )
   // Lido direto pelo id: quem já saiu da equipe continua no registro da OS.
   const tecnico = await nomeDoTecnicoDaOS(os.tecnicoId)
@@ -162,6 +179,7 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
       {(!os.interna || pagamento.pagamentos.length > 0) && (
         <Cartao etiqueta="Do cliente" titulo="Pagamento">
           <PagamentoDaOS
+            key={os.status}
             osId={os.id}
             dados={pagamento}
             pronta={os.status === 'pronto'}
@@ -176,9 +194,52 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
             Esta OS foi {os.status === 'devolvido' ? 'devolvida' : 'entregue'} e não muda mais de etapa. O histórico abaixo fica guardado.
           </p>
         ) : (
-          <AcoesStatus osId={os.id} avancos={avancos} voltas={somenteLeitura ? [] : voltas} somenteLeitura={somenteLeitura} />
+          <AcoesStatus
+            osId={os.id}
+            avancos={avancos}
+            voltas={somenteLeitura ? [] : voltas}
+            somenteLeitura={somenteLeitura}
+            dica={dicaEtapa}
+          />
         )}
       </Cartao>
+
+      {os.status === 'pronto' && !somenteLeitura && (
+        <Cartao etiqueta="Saída do aparelho" titulo="Entrega">
+          <EntregarOS
+            osId={os.id}
+            falta={falta}
+            semCusto={pecas.semCusto}
+            semOrcamentoAprovado={!os.interna && orcamento.atual?.status !== 'aprovado'}
+          />
+        </Cartao>
+      )}
+
+      {fechamento && (
+        <Cartao etiqueta="Só você vê" titulo="Quanto sobrou">
+          <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2">
+            <dt className="sobrancelha self-center">Cobrado</dt>
+            <dd className="numeros text-right text-tinta">{formatarReais(fechamento.total)}</dd>
+            <dt className="sobrancelha self-center">Custo das peças</dt>
+            <dd className="numeros text-right text-tinta">− {formatarReais(fechamento.custoPecas)}</dd>
+            <dt className="sobrancelha self-center">
+              Comissão{fechamento.comissaoPercentual > 0 ? ` (${String(fechamento.comissaoPercentual).replace('.', ',')}%)` : ''}
+            </dt>
+            <dd className="numeros text-right text-tinta">− {formatarReais(fechamento.comissao)}</dd>
+            <dt className="sobrancelha self-center border-t border-linha pt-2">Sobrou</dt>
+            <dd
+              className={`numeros border-t border-linha pt-2 text-right font-titulo text-2xl font-semibold ${
+                fechamento.lucro < 0 ? 'text-perigo' : 'text-marca'
+              }`}
+            >
+              {formatarReais(fechamento.lucro)}
+            </dd>
+          </dl>
+          <p className="mt-3 text-sm text-tinta-suave">
+            Valores fechados na entrega. Mudar a comissão ou um custo depois não altera esta OS.
+          </p>
+        </Cartao>
+      )}
 
       <Cartao titulo="Laudo">
         <FormularioLaudo osId={os.id} laudo={os.laudo} somenteLeitura={somenteLeitura} encerrada={terminal} />
