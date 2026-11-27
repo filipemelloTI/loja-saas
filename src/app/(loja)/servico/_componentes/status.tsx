@@ -20,11 +20,14 @@ export function AcoesStatus({
   avancos,
   voltas,
   somenteLeitura,
+  dica,
 }: {
   osId: string
   avancos: StatusOS[]
   voltas: StatusOS[]
   somenteLeitura: boolean
+  /** Onde seguir quando a próxima etapa não sai daqui (orçamento, entrega). */
+  dica?: string
 }) {
   const [msg, setMsg] = useState<Msg>(null)
   const [pendente, iniciar] = useTransition()
@@ -51,6 +54,8 @@ export function AcoesStatus({
   return (
     <fieldset disabled={somenteLeitura} className="flex flex-col gap-4">
       <legend className="sr-only">Mudar a etapa da OS</legend>
+      {dica && <p className="text-tinta-suave">{dica}</p>}
+      {avancos.length > 0 && (
       <Campo
         id="os-obs-etapa"
         name="observacaoEtapa"
@@ -61,6 +66,7 @@ export function AcoesStatus({
         onChange={(e) => setObservacao(e.target.value)}
         dica="Aparece no histórico, junto com a mudança."
       />
+      )}
 
       <div className="flex flex-wrap gap-2">
         {avancos.map((s, i) => (

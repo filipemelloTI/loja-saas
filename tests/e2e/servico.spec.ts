@@ -189,14 +189,56 @@ test('serviço Fase A ponta a ponta: cliente, OS, etapas, histórico e técnico'
     await expect(mostrar).toBeVisible()
   })
 
-  await test.step('avança etapa por etapa até entregue, uma linha nova no histórico a cada passo', async () => {
+  await test.step('Fase B: orçamento, peça com custo, aprovação, pagamento e entrega com lucro', async () => {
     await hidratar(page)
+    await avancar(page, 'aberta', 'em_analise')
+    // Na OS de cliente, aprovar sai do bloco Orçamento, não do botão de etapa.
+    await expect(page.getByRole('button', { name: ROTULO_STATUS.aprovado.rotulo, exact: true })).toHaveCount(0)
+
+    await page.getByLabel('Descrição', { exact: true }).fill('Troca de tela')
+    await page.getByLabel('Preço (R$)', { exact: true }).fill('300')
+    await page.getByRole('button', { name: 'Lançar item' }).click()
+    await expect(page.getByText('Item lançado.')).toBeVisible()
+
+    await page.getByLabel('Peça', { exact: true }).fill('Tela Tab A9')
+    await page.getByLabel('Preço cobrado (R$)').fill('350')
+    await page.getByRole('button', { name: 'Lançar peça' }).click()
+    await expect(page.getByText('Peça lançada.', { exact: false })).toBeVisible()
+    await expect(page.getByText('Custo pendente')).toBeVisible()
+
+    await page.getByLabel('Custo por unidade (R$)').fill('280')
+    await page.getByRole('button', { name: 'Salvar custo' }).click()
+    await expect(page.getByText('Custo salvo.')).toBeVisible()
+
+    const antes = await historico(page).count()
+    await page.getByLabel('Quem aprovou').fill('Cliente no balcão')
+    await page.getByLabel('Como aprovou').selectOption('balcao')
+    await page.getByRole('button', { name: 'Registrar aprovação' }).click()
+    await expect(historico(page)).toHaveCount(antes + 1)
+    await expect(cabecalho(page)).toContainText(ROTULO_STATUS.aprovado.rotulo)
+
+    await avancar(page, 'aprovado', 'em_servico')
+    await avancar(page, 'em_servico', 'pronto')
+    // "Entregue" não é botão de etapa: a entrega congela os números.
+    await expect(page.getByRole('button', { name: ROTULO_STATUS.entregue.rotulo, exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Entregar aparelho' })).toBeDisabled()
+    await expect(page.getByText(/Falta receber R\$\s650,00\./)).toBeVisible()
+
+    await page.reload()
+    await hidratar(page)
+    await expect(page.getByLabel('Valor (R$)')).toHaveValue('650,00')
+    await page.getByRole('button', { name: 'Registrar pagamento' }).click()
+    await expect(page.getByText('Pagamento registrado.')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Entregar aparelho' }).click()
+    await page.getByRole('button', { name: 'Confirmar entrega' }).click()
+    await expect(cabecalho(page)).toContainText(ROTULO_STATUS.entregue.rotulo)
+
+    const sobrou = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Quanto sobrou' }) })
+    await expect(sobrou).toContainText(/R\$\s370,00/)
+
     const caminho: StatusOS[] = ['aberta', 'em_analise', 'aprovado', 'em_servico', 'pronto', 'entregue']
-    for (let i = 1; i < caminho.length; i++) {
-      await avancar(page, caminho[i - 1], caminho[i])
-    }
     await expect(historico(page)).toHaveCount(caminho.length)
-    // As linhas seguem a ordem das etapas, da abertura à entrega.
     for (let i = 0; i < caminho.length; i++) {
       await expect(historico(page).nth(i)).toContainText(ROTULO_STATUS[caminho[i]].rotulo)
     }

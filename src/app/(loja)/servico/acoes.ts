@@ -2,6 +2,22 @@
 
 import { refresh } from 'next/cache'
 import { abrirOSCom, mudarStatusCom, salvarLaudoCom, type DadosNovaOS, type Dependencias } from '@/lib/os'
+import {
+  adicionarItemCom,
+  aprovarOrcamentoCom,
+  enviarOrcamentoCom,
+  novaVersaoCom,
+  recusarOrcamentoCom,
+  removerItemCom,
+  salvarDescontoCom,
+  type DadosAprovacao,
+  type DadosDesconto,
+  type DadosItem,
+} from '@/lib/orcamento-acoes'
+import { entregarOSCom } from '@/lib/fechamento'
+import { registrarPagamentoCom, removerPagamentoCom, type DadosPagamento } from '@/lib/pagamento-acoes'
+import { adicionarPecaCom, removerPecaCom, salvarCustoPecaCom, type DadosPeca } from '@/lib/pecas-acoes'
+import type { Resultado } from '@/lib/resultado'
 import type { StatusOS } from '@/lib/os-status'
 import { exigirArea } from '@/lib/sessao'
 import { criarClienteServidor } from '@/lib/supabase/servidor'
@@ -48,4 +64,70 @@ export async function salvarLaudo(osId: string, laudo: string) {
   const r = await salvarLaudoCom(await dependencias(), osId, laudo)
   if (r.ok) refresh()
   return r
+}
+
+// Orçamento ------------------------------------------------------------------
+
+async function comRefresh(r: Promise<Resultado>) {
+  const resultado = await r
+  if (resultado.ok) refresh()
+  return resultado
+}
+
+export async function adicionarItemOrcamento(osId: string, dados: DadosItem) {
+  return comRefresh(adicionarItemCom(await dependencias(), osId, dados))
+}
+
+export async function removerItemOrcamento(itemId: string) {
+  return comRefresh(removerItemCom(await dependencias(), itemId))
+}
+
+export async function salvarDescontoOrcamento(orcamentoId: string, dados: DadosDesconto) {
+  return comRefresh(salvarDescontoCom(await dependencias(), orcamentoId, dados))
+}
+
+export async function enviarOrcamento(orcamentoId: string) {
+  return comRefresh(enviarOrcamentoCom(await dependencias(), orcamentoId))
+}
+
+export async function aprovarOrcamento(orcamentoId: string, dados: DadosAprovacao) {
+  return comRefresh(aprovarOrcamentoCom(await dependencias(), orcamentoId, dados))
+}
+
+export async function recusarOrcamento(orcamentoId: string) {
+  return comRefresh(recusarOrcamentoCom(await dependencias(), orcamentoId))
+}
+
+export async function novaVersaoOrcamento(orcamentoId: string) {
+  return comRefresh(novaVersaoCom(await dependencias(), orcamentoId))
+}
+
+// Peças ----------------------------------------------------------------------
+
+export async function adicionarPeca(osId: string, dados: DadosPeca) {
+  return comRefresh(adicionarPecaCom(await dependencias(), osId, dados))
+}
+
+export async function removerPeca(pecaId: string) {
+  return comRefresh(removerPecaCom(await dependencias(), pecaId))
+}
+
+export async function salvarCustoPeca(pecaId: string, custoUnitario: number) {
+  return comRefresh(salvarCustoPecaCom(await dependencias(), pecaId, custoUnitario))
+}
+
+// Pagamento ------------------------------------------------------------------
+
+export async function registrarPagamento(osId: string, dados: DadosPagamento) {
+  return comRefresh(registrarPagamentoCom(await dependencias(), osId, dados))
+}
+
+export async function removerPagamento(pagamentoId: string) {
+  return comRefresh(removerPagamentoCom(await dependencias(), pagamentoId))
+}
+
+// Entrega --------------------------------------------------------------------
+
+export async function entregarOS(osId: string) {
+  return comRefresh(entregarOSCom(await dependencias(), osId))
 }

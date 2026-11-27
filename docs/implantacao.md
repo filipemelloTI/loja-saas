@@ -183,6 +183,20 @@ Tudo que mordeu durante a montagem. Formato do projeto: **sintoma → causa → 
 | A página não hidrata; chunks `/_next/...` bloqueados | O `next dev` bloqueia recursos de dev vindos de **outra origem**; apontar o teste para `127.0.0.1` conta como cross-origin | Usar **`localhost`** como host do servidor de teste (é o que o `playwright.config.ts` faz), ou liberar `allowedDevOrigins` no `next.config` |
 | A tela de **definir senha** aparece e some; o campo some antes de preencher | Em dev o React (Strict Mode) roda o efeito **duas vezes** e a 2ª chamada consome o token de **uso único**, caindo em "link inválido" | Em produção (sem Strict Mode) o link funciona de primeira. No e2e, se a tela não estabiliza, o teste **gera um link fresco** pela service role e repete |
 | `next dev` responde **500 "Jest worker"** numa porta | Servidor de dev com cache velho travado | Subir um `next dev` novo em **outra porta** e apontar o `baseURL`/`webServer` do Playwright para ela (o config usa a porta `3100` por padrão) |
+| `getByRole('region', { name: 'Quanto sobrou' })` não acha o bloco | O `Cartao` é uma `<section>` **sem nome acessível**, então não vira "region" | Localizar pela seção que contém o título: `page.locator('section').filter({ has: page.getByRole('heading', { name: '…' }) })` |
+| Teste de banco (pgTAP) que passava começa a falhar depois de rodar o e2e ou de testar na mão | O teste **conta linhas do banco inteiro** (`count(*)` fora da sessão de um usuário) e pega dados reais deixados pelo e2e | Todo `count`/`update` feito como servidor no teste filtra pela loja ou OS **criada no próprio teste** |
+
+### Fase B do Serviço (orçamento, peças, pagamento, entrega)
+
+| Sintoma | Causa | Solução |
+|---|---|---|
+| `db push` recusa as migrações ("inserted before the last migration") | Uma migração foi aplicada com número **maior** que outras criadas depois dela | Nunca criar migração com número menor que a última aplicada. Se já aconteceu no local, **renumerar as seguintes** para depois dela (foi o que se fez com `090700`/`090800`), em vez de resetar o banco |
+| Depois de trocar de branch, `npm test` falha com "Cannot find module 'vite-tsconfig-paths'" | Uma branch removeu o pacote da `node_modules`; a outra ainda o usa | Rodar `npm install` sempre que trocar de branch |
+| Atendente consegue ler o lucro/custo da OS pela API, mesmo a tela escondendo | O valor estava numa **coluna** de uma tabela que todos os perfis leem; esconder na tela não protege | Valor só do Dono vai para **tabela própria** com RLS `meu_perfil() = 'dono'` (`os_pecas_custo`, `os_fechamento`), no padrão de `servicos_custo` |
+| Gatilho que "libera" gravação quando uma variável de sessão está ligada não protege nada | `set_config`/`set local` pode ser chamado por **qualquer** usuário logado | Liberar por **quem roda**: função `security definer` (roda como servidor) + gatilho que barra só `current_user in ('authenticated','anon')` |
+| Usuário de uma loja consegue pendurar item no orçamento de outra loja | O filho estava ligado ao pai por um vínculo **simples** (`orcamento_id`); a RLS confere só o `loja_id` do próprio filho | Vínculo **composto** `(pai_id, loja_id) → pai (id, loja_id)`: o filho só se liga a pai da mesma loja |
+| Formulário de um bloco não reflete o dado novo depois de salvar (ex.: valor do pagamento não vem preenchido quando a OS fica pronta) | O estado inicial do `useState` só é lido na **primeira** montagem; o `refresh()` traz dados novos mas o componente não reinicia | Dar ao bloco uma `key` com o que deve reiniciá-lo (versão do orçamento, status da OS, custo da peça) |
+| Na nuvem, a tela de OS dá erro ao abrir orçamento, peças ou pagamento | As migrações da Fase B (`20261126*`) ainda **não subiram** para o Supabase da nuvem | Depois do merge: `npx supabase link --project-ref <ref>` e `npx supabase db push` (passo 3). Conferir com `select table_name from information_schema.tables where table_name like 'os_%'` |
 
 ---
 

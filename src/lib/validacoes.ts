@@ -122,3 +122,47 @@ export const esquemaNovaOS = z
 export const esquemaLaudo = z.object({
   laudo: z.string().trim().min(1, 'Escreva o laudo'),
 })
+
+export const esquemaItemOrcamento = z.object({
+  descricao: z.string().trim().min(1, 'Descreva o item').max(120, 'Máximo de 120 caracteres'),
+  quantidade: z.number({ message: 'Informe a quantidade' }).int('Use um número inteiro').min(1, 'Mínimo 1').max(999, 'Máximo 999'),
+  precoUnitario: dinheiro,
+  servicoId: opcional(z.string().uuid('Serviço inválido')),
+})
+
+export const esquemaPeca = z.object({
+  descricao: z.string().trim().min(1, 'Descreva a peça').max(120, 'Máximo de 120 caracteres'),
+  quantidade: z.number({ message: 'Informe a quantidade' }).int('Use um número inteiro').min(1, 'Mínimo 1').max(999, 'Máximo 999'),
+  precoUnitario: dinheiro,
+})
+
+export const esquemaCustoPeca = z.object({ custoUnitario: dinheiro })
+
+export const esquemaDesconto = z.discriminatedUnion('tipo', [
+  z.object({ tipo: z.literal('nenhum') }),
+  z.object({ tipo: z.literal('valor'), valor: dinheiro }),
+  z.object({
+    tipo: z.literal('percentual'),
+    valor: z.number({ message: 'Informe um número' }).min(0, 'Mínimo 0%').max(100, 'Máximo 100%'),
+  }),
+])
+
+export const esquemaPagamento = z
+  .object({
+    forma: z.string().trim().min(1, 'Escolha a forma de pagamento'),
+    parcelas: z.number({ message: 'Informe as parcelas' }).int('Use um número inteiro').min(1, 'Mínimo 1').max(24, 'Máximo 24').optional(),
+    valor: z.number({ message: 'Informe o valor' }).positive('O valor precisa ser maior que zero'),
+  })
+  .superRefine((p, ctx) => {
+    if (p.forma === 'credito' && p.parcelas === undefined)
+      ctx.addIssue({ code: 'custom', message: 'Informe em quantas parcelas', path: ['parcelas'] })
+    if (p.forma !== 'credito' && p.parcelas !== undefined)
+      ctx.addIssue({ code: 'custom', message: 'Parcelas só no crédito', path: ['parcelas'] })
+  })
+
+export const MEIOS_APROVACAO = ['balcao', 'telefone', 'whatsapp', 'outro'] as const
+
+export const esquemaAprovacao = z.object({
+  por: z.string().trim().min(1, 'Informe quem aprovou').max(80, 'Máximo de 80 caracteres'),
+  meio: z.enum(MEIOS_APROVACAO, { message: 'Informe como o cliente aprovou' }),
+})
