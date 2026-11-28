@@ -78,6 +78,8 @@ async function avancar(page: Page, de: StatusOS, para: StatusOS) {
 }
 
 test('serviço ponta a ponta: cliente, OS, orçamento, entrega, link do cliente e técnico', async ({ page, browser }) => {
+  // Fluxo longo (Fases A a D) e o servidor de desenvolvimento compila cada rota na primeira visita.
+  test.setTimeout(240_000)
   const nomeLoja = `Loja OS ${run}`
   let linkDono = ''
   let urlOS = ''
@@ -187,6 +189,25 @@ test('serviço ponta a ponta: cliente, OS, orçamento, entrega, link do cliente 
     await expect(page.getByText(SENHA_APARELHO)).toHaveCount(0)
     expect(await page.content()).not.toContain(SENHA_APARELHO)
     await expect(mostrar).toBeVisible()
+  })
+
+  await test.step('Fase D: comprovante sem a senha e foto de entrada', async () => {
+    await page.goto(`${urlOS}/comprovante`)
+    await expect(page.getByRole('heading', { name: /Comprovante de entrada/ })).toBeVisible()
+    await expect(page.getByText('Não liga depois de molhar')).toBeVisible()
+    expect(await (await page.request.get(page.url())).text()).not.toContain(SENHA_APARELHO)
+    expect(await page.content()).not.toContain(SENHA_APARELHO)
+
+    await page.goto(urlOS)
+    await hidratar(page)
+    // PNG de 1×1 pixel: o navegador reduz e reenvia como JPEG.
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64',
+    )
+    await page.locator('#foto-entrada').setInputFiles({ name: 'aparelho.png', mimeType: 'image/png', buffer: png })
+    await expect(page.getByText('Foto enviada.')).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Fotos na entrada' }).getByRole('img')).toHaveCount(1)
   })
 
   await test.step('Fase B: orçamento, peça com custo, aprovação, pagamento e entrega com lucro', async () => {

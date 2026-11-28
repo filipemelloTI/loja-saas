@@ -8,12 +8,12 @@ import { formatarData, formatarDataISO, formatarTelefone } from '@/lib/formatar'
 import { situacaoGarantia } from '@/lib/garantia'
 import { ROTULO_APARELHO } from '@/lib/rotulos'
 import { contextoAtual } from '@/lib/sessao'
-import { carregarOrcamento, carregarOS, carregarTermo } from '../../dados'
-import { BotaoImprimir } from './imprimir'
+import { carregarAssinaturas, carregarOrcamento, carregarOS, carregarTermo } from '../../dados'
+import { Documento, lerFormato, type Formato } from '../../_componentes/documento'
 
 export const metadata: Metadata = { title: 'Termo de garantia' }
 
-export default function PaginaTermo({ params }: PageProps<'/servico/[id]/termo'>) {
+export default function PaginaTermo({ params, searchParams }: PageProps<'/servico/[id]/termo'>) {
   return (
     <AreaProtegida area="servico">
       <Suspense
@@ -23,14 +23,19 @@ export default function PaginaTermo({ params }: PageProps<'/servico/[id]/termo'>
           </p>
         }
       >
-        <Termo params={params} />
+        <Termo params={params} searchParams={searchParams} />
       </Suspense>
     </AreaProtegida>
   )
 }
 
-async function Termo({ params }: { params: PageProps<'/servico/[id]/termo'>['params'] }) {
-  const { id } = await params
+async function Termo({
+  params,
+  searchParams,
+}: Pick<PageProps<'/servico/[id]/termo'>, 'params' | 'searchParams'>) {
+  const [{ id }, busca] = await Promise.all([params, searchParams])
+  const formato: Formato = lerFormato(busca.formato)
+  const estreito = formato === '80mm'
   const [{ os }, orcamento, ctx] = await Promise.all([carregarOS(id), carregarOrcamento(id), contextoAtual()])
   if (!os) notFound()
   if (os.status !== 'entregue' || os.garantiaDias === null || !os.encerradaEm) {
@@ -44,28 +49,28 @@ async function Termo({ params }: { params: PageProps<'/servico/[id]/termo'>['par
     )
   }
 
-  const termo = await carregarTermo(os.clienteId)
+  const [termo, assinaturas] = await Promise.all([carregarTermo(os.clienteId), carregarAssinaturas(os.id)])
   const g = situacaoGarantia(os.encerradaEm, os.garantiaDias)
   const servicos = [
     ...(orcamento.atual?.status === 'aprovado' ? orcamento.atual.itens.map((i) => i.descricao) : []),
     ...orcamento.pecas.map((p) => `Peça: ${p.descricao}`),
   ]
   const aparelho = [ROTULO_APARELHO[os.aparelhoTipo] ?? 'Aparelho', os.marca, os.modelo, os.cor].filter(Boolean).join(' · ')
-  const linha = 'grid grid-cols-[9rem_1fr] gap-x-3 gap-y-1 print:grid-cols-[8rem_1fr]'
+  const linha = estreito ? 'flex flex-col gap-1' : 'grid grid-cols-[9rem_1fr] gap-x-3 gap-y-1 print:grid-cols-[8rem_1fr]'
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <Link href={`/servico/${id}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-marca hover:underline">
-          <span aria-hidden="true">←&nbsp;</span>OS Nº {os.numero}
-        </Link>
-        <BotaoImprimir />
-      </div>
-
-      {/* Folha A4: fundo e tinta fixos de papel, também no tema escuro. */}
-      <article className="mx-auto w-full max-w-[210mm] rounded-xl border border-linha bg-folha p-6 text-sobre-folha shadow-sm sm:p-10 print:max-w-none print:rounded-none print:border-0 print:p-0 print:shadow-none">
-        <header className="flex flex-col gap-1 border-b border-folha-linha pb-4">
-          <p className="font-titulo text-2xl font-bold">{ctx?.loja?.nome}</p>
+    <Documento
+      voltar={{ href: `/servico/${id}`, rotulo: `OS Nº ${os.numero}` }}
+      formato={formato}
+      papel={estreito ? 'size: 80mm auto; margin: 2mm;' : 'size: A4; margin: 12mm;'}
+      outros={[
+        estreito
+          ? { href: `/servico/${id}/termo?formato=a4`, rotulo: 'Ver em A4' }
+          : { href: `/servico/${id}/termo?formato=80mm`, rotulo: 'Ver em 80 mm' },
+      ]}
+    >
+        <header className={`flex flex-col gap-1 border-b border-folha-linha pb-4 ${estreito ? 'items-center text-center' : ''}`}>
+          <p className={`font-titulo font-bold ${estreito ? 'text-base' : 'text-2xl'}`}>{ctx?.loja?.nome}</p>
           <p className="text-sm text-folha-suave">
             {[termo.loja.cnpj && `CNPJ ${termo.loja.cnpj}`, termo.loja.endereco, termo.loja.telefone && formatarTelefone(termo.loja.telefone)]
               .filter(Boolean)
@@ -73,11 +78,11 @@ async function Termo({ params }: { params: PageProps<'/servico/[id]/termo'>['par
           </p>
         </header>
 
-        <h1 className="mt-6 font-titulo text-xl font-bold">
+        <h1 className={`mt-6 font-titulo font-bold ${estreito ? 'text-base' : 'text-xl'}`}>
           Termo de garantia de serviço — OS <span className="numeros">Nº {os.numero}</span>
         </h1>
 
-        <section className="mt-5 flex flex-col gap-4 text-sm">
+        <section className="mt-5 flex flex-col gap-4">
           <dl className={linha}>
             <dt className="font-semibold">Cliente</dt>
             <dd>
@@ -111,11 +116,16 @@ async function Termo({ params }: { params: PageProps<'/servico/[id]/termo'>['par
           {termo.loja.textoTermos && <p className="whitespace-pre-wrap">{termo.loja.textoTermos}</p>}
         </section>
 
-        <footer className="mt-16 grid gap-10 text-center text-sm sm:grid-cols-2 print:grid-cols-2">
+        <footer className={`mt-16 grid gap-10 text-center ${estreito ? '' : 'grid-cols-2'}`}>
           <div className="border-t border-sobre-folha pt-2">{ctx?.loja?.nome}</div>
-          <div className="border-t border-sobre-folha pt-2">{termo.cliente?.nome ?? 'Cliente'}</div>
+          <div className="flex flex-col items-center">
+            {assinaturas.entrega && (
+              // eslint-disable-next-line @next/next/no-img-element -- URL assinada e temporária
+              <img src={assinaturas.entrega} alt="Assinatura do cliente na entrega" className="h-14" />
+            )}
+            <div className="w-full border-t border-sobre-folha pt-2">{termo.cliente?.nome ?? 'Cliente'}</div>
+          </div>
         </footer>
-      </article>
-    </div>
+    </Documento>
   )
 }

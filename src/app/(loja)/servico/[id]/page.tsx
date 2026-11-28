@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { AreaProtegida } from '@/components/AreaProtegida'
-import { Roda } from '@/components/ui/Botao'
+import { classesBotao, Roda } from '@/components/ui/Botao'
 import { Cartao } from '@/components/ui/Cartao'
 import { Selo } from '@/components/ui/Selo'
 import { formatarReais } from '@/lib/dinheiro'
@@ -17,6 +17,8 @@ import { FormularioLaudo } from '../_componentes/formulario'
 import { OrcamentoDaOS } from '../_componentes/orcamento'
 import { AvisarCliente } from '../_componentes/avisar'
 import { EntregarOS } from '../_componentes/entregar'
+import { AssinaturaDoCliente } from '../_componentes/assinatura'
+import { FotosDaOS } from '../_componentes/fotos'
 import { GarantiaDaOS } from '../_componentes/garantia'
 import { PagamentoDaOS } from '../_componentes/pagamento'
 import { PecasDaOS } from '../_componentes/pecas'
@@ -25,6 +27,8 @@ import { AcoesStatus } from '../_componentes/status'
 import {
   carregarAviso,
   carregarFechamento,
+  carregarFotos,
+  carregarAssinaturas,
   carregarGarantia,
   carregarOrcamento,
   carregarOS,
@@ -59,7 +63,7 @@ export default function PaginaOS({ params }: PageProps<'/servico/[id]'>) {
 
 async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params'] }) {
   const { id } = await params
-  const [{ os, somenteLeitura }, ctx, orcamento, servicos, pecas, pagamento, fechamento] = await Promise.all([
+  const [{ os, somenteLeitura }, ctx, orcamento, servicos, pecas, pagamento, fechamento, fotos, assinaturas] = await Promise.all([
     carregarOS(id),
     contextoAtual(),
     carregarOrcamento(id),
@@ -67,6 +71,8 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
     carregarPecas(id),
     carregarPagamento(id),
     carregarFechamento(id),
+    carregarFotos(id),
+    carregarAssinaturas(id),
   ])
   if (!os) notFound()
   const aviso = !os.interna && os.clienteId && !somenteLeitura ? await carregarAviso(os.clienteId, os.tokenPublico) : null
@@ -125,6 +131,18 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
         </h1>
         <Selo tom={status.tom}>{status.rotulo}</Selo>
       </div>
+
+      <nav aria-label="Documentos da OS" className="-mt-3 flex flex-wrap gap-2">
+        <Link href={`/servico/${os.id}/comprovante`} className={classesBotao('secundario')}>
+          Comprovante A4
+        </Link>
+        <Link href={`/servico/${os.id}/comprovante?formato=80mm`} className={classesBotao('discreto')}>
+          Cupom 80 mm
+        </Link>
+        <Link href={`/servico/${os.id}/etiqueta`} className={classesBotao('discreto')}>
+          Etiqueta
+        </Link>
+      </nav>
 
       <Cartao etiqueta="Ficha" titulo="Aparelho e cliente">
         <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-4 gap-y-2">
@@ -298,6 +316,31 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
           <p className="mt-3 text-sm text-tinta-suave">
             Valores fechados na entrega. Mudar a comissão ou um custo depois não altera esta OS.
           </p>
+        </Cartao>
+      )}
+
+      <Cartao etiqueta="Do aparelho" titulo="Fotos">
+        <FotosDaOS osId={os.id} fotos={fotos} podeApagar={!terminal} bloqueado={somenteLeitura} />
+      </Cartao>
+
+      {!os.interna && (
+        <Cartao etiqueta="Com o dedo" titulo="Assinatura do cliente">
+          <div className="flex flex-col gap-5">
+            <AssinaturaDoCliente
+              osId={os.id}
+              momento="entrada"
+              atual={assinaturas.entrada ?? null}
+              pode={!terminal && !somenteLeitura}
+            />
+            {(os.status === 'pronto' || os.status === 'pronto_devolucao' || assinaturas.entrega) && (
+              <AssinaturaDoCliente
+                osId={os.id}
+                momento="entrega"
+                atual={assinaturas.entrega ?? null}
+                pode={(os.status === 'pronto' || os.status === 'pronto_devolucao') && !somenteLeitura}
+              />
+            )}
+          </div>
         </Cartao>
       )}
 
