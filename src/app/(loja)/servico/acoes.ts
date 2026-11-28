@@ -15,6 +15,7 @@ import {
   type DadosItem,
 } from '@/lib/orcamento-acoes'
 import { entregarOSCom } from '@/lib/fechamento'
+import { enviarFotoCom, removerFotoCom } from '@/lib/fotos'
 import { abrirGarantiaCom, ajustarGarantiaCom } from '@/lib/garantia-acoes'
 import { registrarPagamentoCom, removerPagamentoCom, type DadosPagamento } from '@/lib/pagamento-acoes'
 import { adicionarPecaCom, removerPecaCom, salvarCustoPecaCom, type DadosPeca } from '@/lib/pecas-acoes'
@@ -141,4 +142,16 @@ export async function ajustarGarantia(osId: string, dias: number | null) {
 
 export async function abrirGarantia(osId: string, defeito: string) {
   return abrirGarantiaCom(await dependencias(), osId, defeito)
+}
+
+// Fotos ----------------------------------------------------------------------
+
+export async function enviarFoto(form: FormData) {
+  return comRefresh(
+    enviarFotoCom(await dependencias(), String(form.get('osId') ?? ''), String(form.get('momento') ?? ''), form.get('foto')),
+  )
+}
+
+export async function removerFoto(fotoId: string) {
+  return comRefresh(removerFotoCom(await dependencias(), fotoId))
 }

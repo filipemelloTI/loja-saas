@@ -17,6 +17,7 @@ import { FormularioLaudo } from '../_componentes/formulario'
 import { OrcamentoDaOS } from '../_componentes/orcamento'
 import { AvisarCliente } from '../_componentes/avisar'
 import { EntregarOS } from '../_componentes/entregar'
+import { FotosDaOS } from '../_componentes/fotos'
 import { GarantiaDaOS } from '../_componentes/garantia'
 import { PagamentoDaOS } from '../_componentes/pagamento'
 import { PecasDaOS } from '../_componentes/pecas'
@@ -25,6 +26,7 @@ import { AcoesStatus } from '../_componentes/status'
 import {
   carregarAviso,
   carregarFechamento,
+  carregarFotos,
   carregarGarantia,
   carregarOrcamento,
   carregarOS,
@@ -59,7 +61,7 @@ export default function PaginaOS({ params }: PageProps<'/servico/[id]'>) {
 
 async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params'] }) {
   const { id } = await params
-  const [{ os, somenteLeitura }, ctx, orcamento, servicos, pecas, pagamento, fechamento] = await Promise.all([
+  const [{ os, somenteLeitura }, ctx, orcamento, servicos, pecas, pagamento, fechamento, fotos] = await Promise.all([
     carregarOS(id),
     contextoAtual(),
     carregarOrcamento(id),
@@ -67,6 +69,7 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
     carregarPecas(id),
     carregarPagamento(id),
     carregarFechamento(id),
+    carregarFotos(id),
   ])
   if (!os) notFound()
   const aviso = !os.interna && os.clienteId && !somenteLeitura ? await carregarAviso(os.clienteId, os.tokenPublico) : null
@@ -312,6 +315,10 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
           </p>
         </Cartao>
       )}
+
+      <Cartao etiqueta="Do aparelho" titulo="Fotos">
+        <FotosDaOS osId={os.id} fotos={fotos} podeApagar={!terminal} bloqueado={somenteLeitura} />
+      </Cartao>
 
       <Cartao titulo="Laudo">
         <FormularioLaudo osId={os.id} laudo={os.laudo} somenteLeitura={somenteLeitura} encerrada={terminal} />
