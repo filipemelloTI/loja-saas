@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { AreaProtegida } from '@/components/AreaProtegida'
-import { Roda } from '@/components/ui/Botao'
+import { classesBotao, Roda } from '@/components/ui/Botao'
 import { Cartao } from '@/components/ui/Cartao'
 import { Selo } from '@/components/ui/Selo'
 import { formatarReais } from '@/lib/dinheiro'
@@ -125,6 +125,18 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
         </h1>
         <Selo tom={status.tom}>{status.rotulo}</Selo>
       </div>
+
+      <nav aria-label="Documentos da OS" className="-mt-3 flex flex-wrap gap-2">
+        <Link href={`/servico/${os.id}/comprovante`} className={classesBotao('secundario')}>
+          Comprovante A4
+        </Link>
+        <Link href={`/servico/${os.id}/comprovante?formato=80mm`} className={classesBotao('discreto')}>
+          Cupom 80 mm
+        </Link>
+        <Link href={`/servico/${os.id}/etiqueta`} className={classesBotao('discreto')}>
+          Etiqueta
+        </Link>
+      </nav>
 
       <Cartao etiqueta="Ficha" titulo="Aparelho e cliente">
         <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-4 gap-y-2">

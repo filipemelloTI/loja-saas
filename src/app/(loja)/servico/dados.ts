@@ -163,6 +163,12 @@ export async function listarGarantias(): Promise<ItemGarantia[]> {
   return listarGarantiasCom(supabase)
 }
 
+/** Endereço do link público da OS, ou `null` se o endereço do site não está configurado. */
+export async function linkAcompanhamento(tokenPublico: string): Promise<string | null> {
+  const origem = await origemDoSite().catch(() => null)
+  return origem ? `${origem}/acompanhar/${tokenPublico}` : null
+}
+
 export type ServicoCatalogo = { id: string; nome: string; preco: number }
 
 /** Serviços ativos do catálogo da loja, para preencher o item do orçamento. O custo fica de fora. */
