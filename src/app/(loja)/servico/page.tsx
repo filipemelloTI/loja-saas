@@ -45,13 +45,16 @@ async function Conteudo({ searchParams }: { searchParams: Busca }) {
   const { ordens, somenteLeitura } = await listarOS(filtro)
   return (
     <>
-      {!somenteLeitura && (
-        <div>
+      <div className="flex flex-wrap gap-2">
+        {!somenteLeitura && (
           <Link href="/servico/nova" className={classesBotao('primario')}>
             Nova OS
           </Link>
-        </div>
-      )}
+        )}
+        <Link href="/servico/garantias" className={classesBotao('secundario')}>
+          Garantias
+        </Link>
+      </div>
       <ListaOS ordens={ordens} filtro={filtro} somenteLeitura={somenteLeitura} />
     </>
   )

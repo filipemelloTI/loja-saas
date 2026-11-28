@@ -4,6 +4,7 @@ import { carregarOrcamentoCom, type DadosOrcamento } from '@/lib/orcamento-acoes
 import { carregarPecasCom, type DadosPecas } from '@/lib/pecas-acoes'
 import { carregarPagamentosCom, totalDaOSCom, type Pagamento } from '@/lib/pagamento-acoes'
 import { carregarFechamentoCom, type Fechamento } from '@/lib/fechamento'
+import { listarGarantiasCom, type ItemGarantia } from '@/lib/garantia-lista'
 import { eventoValido, type Evento } from '@/lib/mensagens'
 import { origemDoSite } from '@/lib/origem'
 import type { StatusOS } from '@/lib/os-status'
@@ -154,6 +155,12 @@ export async function carregarTermo(clienteId: string | null): Promise<DadosTerm
     cliente: cliente.data ? { nome: cliente.data.nome as string, telefone: (cliente.data.telefone as string | null) ?? null } : null,
     condicoes: ((condicoes.data ?? []) as { texto: string }[]).map((x) => x.texto),
   }
+}
+
+/** OS entregues ainda em garantia, as que vencem antes primeiro. */
+export async function listarGarantias(): Promise<ItemGarantia[]> {
+  const { supabase } = await base()
+  return listarGarantiasCom(supabase)
 }
 
 export type ServicoCatalogo = { id: string; nome: string; preco: number }
