@@ -15,6 +15,7 @@ import {
   type DadosItem,
 } from '@/lib/orcamento-acoes'
 import { entregarOSCom } from '@/lib/fechamento'
+import { salvarAssinaturaCom } from '@/lib/assinatura'
 import { enviarFotoCom, removerFotoCom } from '@/lib/fotos'
 import { abrirGarantiaCom, ajustarGarantiaCom } from '@/lib/garantia-acoes'
 import { registrarPagamentoCom, removerPagamentoCom, type DadosPagamento } from '@/lib/pagamento-acoes'
@@ -154,4 +155,17 @@ export async function enviarFoto(form: FormData) {
 
 export async function removerFoto(fotoId: string) {
   return comRefresh(removerFotoCom(await dependencias(), fotoId))
+}
+
+// Assinatura -----------------------------------------------------------------
+
+export async function salvarAssinatura(form: FormData) {
+  return comRefresh(
+    salvarAssinaturaCom(
+      await dependencias(),
+      String(form.get('osId') ?? ''),
+      String(form.get('momento') ?? ''),
+      form.get('assinatura'),
+    ),
+  )
 }

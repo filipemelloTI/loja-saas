@@ -8,7 +8,7 @@ import { gerarQrSvg } from '@/lib/qr'
 import { ROTULO_APARELHO } from '@/lib/rotulos'
 import { contextoAtual } from '@/lib/sessao'
 import { Documento, lerFormato, type Formato } from '../../_componentes/documento'
-import { carregarOS, carregarTermo, linkAcompanhamento } from '../../dados'
+import { carregarAssinaturas, carregarOS, carregarTermo, linkAcompanhamento } from '../../dados'
 
 export const metadata: Metadata = { title: 'Comprovante de entrada' }
 
@@ -36,7 +36,11 @@ async function Comprovante({ params, searchParams }: Pick<Props, 'params' | 'sea
   const [{ os }, ctx] = await Promise.all([carregarOS(id), contextoAtual()])
   if (!os) notFound()
 
-  const [termo, link] = await Promise.all([carregarTermo(os.clienteId), os.interna ? null : linkAcompanhamento(os.tokenPublico)])
+  const [termo, link, assinaturas] = await Promise.all([
+    carregarTermo(os.clienteId),
+    os.interna ? null : linkAcompanhamento(os.tokenPublico),
+    carregarAssinaturas(os.id),
+  ])
   const qr = link ? await gerarQrSvg(link) : null
   const estreito = formato === '80mm'
   const aparelho = [ROTULO_APARELHO[os.aparelhoTipo] ?? 'Aparelho', os.marca, os.modelo].filter(Boolean).join(' · ')
@@ -133,7 +137,13 @@ async function Comprovante({ params, searchParams }: Pick<Props, 'params' | 'sea
 
       <div className={`mt-10 grid gap-8 text-center ${estreito ? '' : 'grid-cols-2'}`}>
         <div className="border-t border-sobre-folha pt-1">{ctx?.loja?.nome}</div>
-        <div className="border-t border-sobre-folha pt-1">{os.interna ? 'Responsável' : (termo.cliente?.nome ?? 'Cliente')}</div>
+        <div className="flex flex-col items-center">
+          {assinaturas.entrada && (
+            // eslint-disable-next-line @next/next/no-img-element -- URL assinada e temporária
+            <img src={assinaturas.entrada} alt="Assinatura do cliente na entrada" className="h-14" />
+          )}
+          <div className="w-full border-t border-sobre-folha pt-1">{os.interna ? 'Responsável' : (termo.cliente?.nome ?? 'Cliente')}</div>
+        </div>
       </div>
     </Documento>
   )

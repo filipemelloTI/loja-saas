@@ -4,6 +4,7 @@ import { carregarOrcamentoCom, type DadosOrcamento } from '@/lib/orcamento-acoes
 import { carregarPecasCom, type DadosPecas } from '@/lib/pecas-acoes'
 import { carregarPagamentosCom, totalDaOSCom, type Pagamento } from '@/lib/pagamento-acoes'
 import { carregarFechamentoCom, type Fechamento } from '@/lib/fechamento'
+import { carregarAssinaturasCom, type MomentoAssinatura } from '@/lib/assinatura'
 import { carregarFotosCom, type Foto } from '@/lib/fotos'
 import { listarGarantiasCom, type ItemGarantia } from '@/lib/garantia-lista'
 import { eventoValido, type Evento } from '@/lib/mensagens'
@@ -174,6 +175,12 @@ export async function linkAcompanhamento(tokenPublico: string): Promise<string |
 export async function carregarFotos(osId: string): Promise<Foto[]> {
   const { supabase } = await base()
   return carregarFotosCom(supabase, osId)
+}
+
+/** Assinaturas do cliente (entrada e entrega), com endereço assinado. */
+export async function carregarAssinaturas(osId: string): Promise<Partial<Record<MomentoAssinatura, string>>> {
+  const { supabase } = await base()
+  return carregarAssinaturasCom(supabase, osId)
 }
 
 export type ServicoCatalogo = { id: string; nome: string; preco: number }

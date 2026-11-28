@@ -8,7 +8,7 @@ import { formatarData, formatarDataISO, formatarTelefone } from '@/lib/formatar'
 import { situacaoGarantia } from '@/lib/garantia'
 import { ROTULO_APARELHO } from '@/lib/rotulos'
 import { contextoAtual } from '@/lib/sessao'
-import { carregarOrcamento, carregarOS, carregarTermo } from '../../dados'
+import { carregarAssinaturas, carregarOrcamento, carregarOS, carregarTermo } from '../../dados'
 import { Documento, lerFormato, type Formato } from '../../_componentes/documento'
 
 export const metadata: Metadata = { title: 'Termo de garantia' }
@@ -49,7 +49,7 @@ async function Termo({
     )
   }
 
-  const termo = await carregarTermo(os.clienteId)
+  const [termo, assinaturas] = await Promise.all([carregarTermo(os.clienteId), carregarAssinaturas(os.id)])
   const g = situacaoGarantia(os.encerradaEm, os.garantiaDias)
   const servicos = [
     ...(orcamento.atual?.status === 'aprovado' ? orcamento.atual.itens.map((i) => i.descricao) : []),
@@ -118,7 +118,13 @@ async function Termo({
 
         <footer className={`mt-16 grid gap-10 text-center ${estreito ? '' : 'grid-cols-2'}`}>
           <div className="border-t border-sobre-folha pt-2">{ctx?.loja?.nome}</div>
-          <div className="border-t border-sobre-folha pt-2">{termo.cliente?.nome ?? 'Cliente'}</div>
+          <div className="flex flex-col items-center">
+            {assinaturas.entrega && (
+              // eslint-disable-next-line @next/next/no-img-element -- URL assinada e temporária
+              <img src={assinaturas.entrega} alt="Assinatura do cliente na entrega" className="h-14" />
+            )}
+            <div className="w-full border-t border-sobre-folha pt-2">{termo.cliente?.nome ?? 'Cliente'}</div>
+          </div>
         </footer>
     </Documento>
   )
