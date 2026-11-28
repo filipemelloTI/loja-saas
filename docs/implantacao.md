@@ -72,13 +72,14 @@ os dados — admin, planos, lojas — são criados pelos passos 6, 7 e 8.
 
 ### 4. Variáveis de ambiente no Netlify — [conta sua]
 
-**Site settings → Environment variables** → adicione as três:
+**Site settings → Environment variables** → adicione as quatro:
 
 | Nome | Valor | Observação |
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Project URL do passo 1 | público |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon/public key | público |
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role key | **segredo** — marque como sensível |
+| `NEXT_PUBLIC_SITE_URL` | endereço do site, ex.: `https://seu-site.netlify.app` (sem barra no fim) | público — sem ela, os links de definir senha e de acompanhamento da OS não são gerados |
 
 Depois de salvar, **refaça o deploy** (Deploys → Trigger deploy → Deploy site) para o build
 pegar as variáveis.
@@ -185,6 +186,15 @@ Tudo que mordeu durante a montagem. Formato do projeto: **sintoma → causa → 
 | `next dev` responde **500 "Jest worker"** numa porta | Servidor de dev com cache velho travado | Subir um `next dev` novo em **outra porta** e apontar o `baseURL`/`webServer` do Playwright para ela (o config usa a porta `3100` por padrão) |
 | `getByRole('region', { name: 'Quanto sobrou' })` não acha o bloco | O `Cartao` é uma `<section>` **sem nome acessível**, então não vira "region" | Localizar pela seção que contém o título: `page.locator('section').filter({ has: page.getByRole('heading', { name: '…' }) })` |
 | Teste de banco (pgTAP) que passava começa a falhar depois de rodar o e2e ou de testar na mão | O teste **conta linhas do banco inteiro** (`count(*)` fora da sessão de um usuário) e pega dados reais deixados pelo e2e | Todo `count`/`update` feito como servidor no teste filtra pela loja ou OS **criada no próprio teste** |
+
+### Fase C do Serviço (link do cliente, WhatsApp, garantia)
+
+| Sintoma | Causa | Solução |
+|---|---|---|
+| Em produção a página da OS dá "This page couldn't load" | `NEXT_PUBLIC_SITE_URL` não configurada; a montagem de links falha de propósito sem ela (para não gerar link com domínio forjado) | Configurar a variável no Netlify (passo 4). Desde a Fase C a página não cai mais: o cartão "Avisar cliente" só avisa que o link não está disponível |
+| Mudança de CSS (token novo) não aparece no `next dev`, ou a página diz que uma função exportada "is not a function" | `next dev` aberto há muito tempo, com cache velho, parou de recarregar | Encerrar o `next dev` e subir de novo (o Next não deixa dois na mesma pasta). Para conferir sem mexer nele: `npm run build` e `npx next start -p 3102` |
+| Teste no navegador "acha" blocos de outra página (ex.: Orçamento numa OS de garantia) | Depois de navegar, o Next guarda a página anterior **escondida** no DOM | Conferir pelo que está visível (captura de tela) ou procurar dentro do conteúdo da página atual |
+| Folha impressa (termo) sai com texto claro em papel branco | Componente usou os tokens normais, que no tema escuro são claros | Documento impresso usa os tokens `folha` / `sobre-folha`, que são claros nos dois temas |
 
 ### Fase B do Serviço (orçamento, peças, pagamento, entrega)
 

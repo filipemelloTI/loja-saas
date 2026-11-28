@@ -126,7 +126,8 @@ select lives_ok(
 -- A coluna guardada não é texto puro -------------------------------------
 select testes.sair();
 select is(
-  (select count(*) from public.os_senha_aparelho), 4::bigint,
+  (select count(*) from public.os_senha_aparelho
+    where os_id in (select id from ids where chave in ('os_a1', 'os_a2', 'os_a3', 'os_b1'))), 4::bigint,
   'Há 4 senhas guardadas (A1, A2, A3, B1)');
 select is(
   (select count(*) from public.os_senha_aparelho

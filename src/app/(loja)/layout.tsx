@@ -68,27 +68,29 @@ type PropsMoldura = {
 function Moldura({ suporte, topo, lateral, inferior, children }: PropsMoldura) {
   return (
     // Celular: a página rola inteira. Computador: só a coluna de conteúdo rola; a barra lateral fica parada.
-    <div className="flex min-h-dvh flex-col lg:h-dvh">
+    <div className="flex min-h-dvh flex-col lg:h-dvh print:block print:h-auto print:min-h-0">
       {suporte && (
-        <p role="status" className="sticky top-0 z-40 bg-sinal px-4 py-2 text-center text-sm font-semibold text-sobre-sinal lg:static">
+        <p role="status" className="sticky top-0 z-40 print:hidden bg-sinal px-4 py-2 text-center text-sm font-semibold text-sobre-sinal lg:static">
           Modo suporte — somente leitura
         </p>
       )}
-      <div className="flex flex-1 lg:min-h-0">
-        <aside className="hidden w-60 shrink-0 flex-col gap-6 overflow-y-auto bg-trilho px-3 py-5 lg:flex">
+      <div className="flex flex-1 lg:min-h-0 print:block">
+        <aside className="hidden print:hidden w-60 shrink-0 flex-col gap-6 overflow-y-auto bg-trilho px-3 py-5 lg:flex">
           <p className="px-3 font-titulo text-lg font-bold tracking-tight text-marca">{NOME_SISTEMA}</p>
           {lateral}
         </aside>
-        <div className="flex min-w-0 flex-1 flex-col lg:overflow-y-auto">
-          <header className="flex min-h-16 items-center justify-between gap-3 border-b border-linha bg-superficie px-4 lg:px-8">
+        <div className="flex min-w-0 flex-1 flex-col lg:overflow-y-auto print:block print:overflow-visible">
+          <header className="print:hidden flex min-h-16 items-center justify-between gap-3 border-b border-linha bg-superficie px-4 lg:px-8">
             {topo}
           </header>
-          <main className="flex-1 px-4 pt-6 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:px-8 lg:pb-10">
-            <div className="mx-auto max-w-5xl">{children}</div>
+          <main className="flex-1 px-4 pt-6 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:px-8 lg:pb-10 print:p-0">
+            <div className="mx-auto max-w-5xl print:max-w-none">{children}</div>
           </main>
         </div>
       </div>
-      {inferior ?? <div aria-hidden="true" className="fixed inset-x-0 bottom-0 h-14 border-t border-linha bg-superficie lg:hidden" />}
+      <div className="print:hidden">
+        {inferior ?? <div aria-hidden="true" className="fixed inset-x-0 bottom-0 h-14 border-t border-linha bg-superficie lg:hidden" />}
+      </div>
     </div>
   )
 }

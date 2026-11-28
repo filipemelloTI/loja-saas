@@ -4,6 +4,9 @@ import { carregarOrcamentoCom, type DadosOrcamento } from '@/lib/orcamento-acoes
 import { carregarPecasCom, type DadosPecas } from '@/lib/pecas-acoes'
 import { carregarPagamentosCom, totalDaOSCom, type Pagamento } from '@/lib/pagamento-acoes'
 import { carregarFechamentoCom, type Fechamento } from '@/lib/fechamento'
+import { listarGarantiasCom, type ItemGarantia } from '@/lib/garantia-lista'
+import { eventoValido, type Evento } from '@/lib/mensagens'
+import { origemDoSite } from '@/lib/origem'
 import type { StatusOS } from '@/lib/os-status'
 import { perfilEfetivo } from '@/lib/guarda'
 import { exigirArea } from '@/lib/sessao'
@@ -70,6 +73,94 @@ export async function carregarFechamento(osId: string): Promise<Fechamento | nul
   const { supabase, perfil, somenteLeitura } = await base()
   if (perfil !== 'dono' || somenteLeitura) return null
   return carregarFechamentoCom(supabase, osId)
+}
+
+export type DadosAviso = {
+  telefone: string | null
+  mensagens: Partial<Record<Evento, string>>
+  /** Endereço completo do link público desta OS; `null` se o endereço do site não está configurado. */
+  linkAcompanhamento: string | null
+}
+
+/** O que o cartão "Avisar cliente" precisa: telefone do cliente, mensagens da loja e o link público. */
+export async function carregarAviso(clienteId: string | null, tokenPublico: string): Promise<DadosAviso> {
+  const { supabase } = await base()
+  const [cliente, mensagens, origem] = await Promise.all([
+    clienteId
+      ? supabase.from('clientes').select('telefone').eq('id', clienteId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase.from('mensagens_padrao').select('evento, texto'),
+    // Sem o endereço do site configurado, o cartão segue sem o link (a página da OS não pode cair).
+    origemDoSite().catch((e: unknown) => {
+      console.error('carregarAviso: endereço do site indisponível', e instanceof Error ? e.message : e)
+      return null
+    }),
+  ])
+  return {
+    telefone: (cliente.data?.telefone as string | undefined) ?? null,
+    mensagens: Object.fromEntries(
+      ((mensagens.data ?? []) as { evento: string; texto: string }[])
+        .filter((m) => eventoValido(m.evento))
+        .map((m) => [m.evento, m.texto]),
+    ),
+    linkAcompanhamento: origem ? `${origem}/acompanhar/${tokenPublico}` : null,
+  }
+}
+
+export type DadosGarantia = {
+  /** Prazo que a OS terá ao ser entregue (ajuste do Dono, catálogo ou padrão da loja). */
+  prevista: number | null
+  /** Número da OS original, quando esta é de garantia. */
+  numeroOriginal: number | null
+}
+
+export async function carregarGarantia(osId: string, garantiaDe: string | null): Promise<DadosGarantia> {
+  const { supabase } = await base()
+  const [prevista, original] = await Promise.all([
+    supabase.rpc('garantia_prevista_os', { os: osId }),
+    garantiaDe
+      ? supabase.from('ordens_servico').select('numero').eq('id', garantiaDe).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ])
+  return {
+    prevista: (prevista.data as number | null) ?? null,
+    numeroOriginal: (original.data?.numero as number | undefined) ?? null,
+  }
+}
+
+export type DadosTermo = {
+  loja: { cnpj: string | null; endereco: string | null; telefone: string | null; textoTermos: string | null }
+  cliente: { nome: string; telefone: string | null } | null
+  condicoes: string[]
+}
+
+/** O que o termo de garantia imprime além da OS: dados da loja, do cliente e as condições. */
+export async function carregarTermo(clienteId: string | null): Promise<DadosTermo> {
+  const { supabase } = await base()
+  const [config, condicoes, cliente] = await Promise.all([
+    supabase.from('config_loja').select('cnpj, endereco, telefone, texto_termos').maybeSingle(),
+    supabase.from('condicoes_garantia').select('texto').order('ordem'),
+    clienteId
+      ? supabase.from('clientes').select('nome, telefone').eq('id', clienteId).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ])
+  const c = config.data as Record<string, string | null> | null
+  return {
+    loja: {
+      cnpj: c?.cnpj ?? null,
+      endereco: c?.endereco ?? null,
+      telefone: c?.telefone ?? null,
+      textoTermos: c?.texto_termos ?? null,
+    },
+    cliente: cliente.data ? { nome: cliente.data.nome as string, telefone: (cliente.data.telefone as string | null) ?? null } : null,
+    condicoes: ((condicoes.data ?? []) as { texto: string }[]).map((x) => x.texto),
+  }
+}
+
+/** OS entregues ainda em garantia, as que vencem antes primeiro. */
+export async function listarGarantias(): Promise<ItemGarantia[]> {
+  const { supabase } = await base()
+  return listarGarantiasCom(supabase)
 }
 
 export type ServicoCatalogo = { id: string; nome: string; preco: number }
