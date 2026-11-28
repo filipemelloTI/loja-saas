@@ -86,6 +86,10 @@
 - Lista de OS entregues com garantia vigente, mais próximas de vencer primeiro; filtro "vence em até 15 dias"; busca por nome, telefone ou IMEI (pela Server Action, fora da URL, como em Clientes). Link no topo da lista de Serviço.
 - [ ] Testes; navegador; commit.
 
+## Situação (28/11)
+
+Tasks 1 a 6 feitas. Decisões tomadas na execução: OS de garantia não abre garantia nova (vale a da original) e OS interna não tem garantia; WhatsApp só por `wa.me`, sem envio automático; a busca de garantias filtra na tela (o termo não vai para a URL); tokens `folha*` para documento impresso; a página da OS não cai sem `NEXT_PUBLIC_SITE_URL` (variável entrou no guia).
+
 ## Task 7 — Pré-merge
 
 - [ ] pgTAP, Vitest, Playwright (E2E novo: atendente envia orçamento → cliente aprova pelo link num contexto anônimo → OS aprovada), `tsc`, lint, build; pegadinhas em `docs/implantacao.md`; PR.

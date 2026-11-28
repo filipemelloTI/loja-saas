@@ -178,7 +178,8 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
       {((!os.interna && !deGarantia) || orcamento.atual) && (
         <Cartao etiqueta="Para o cliente" titulo="Orçamento">
           <OrcamentoDaOS
-            key={orcamento.atual?.id ?? 'novo'}
+            // Pela versão, não pelo id: criar a versão 1 no primeiro item não pode apagar o "Item lançado.".
+            key={orcamento.atual?.versao ?? 1}
             osId={os.id}
             dados={orcamento}
             servicos={servicos}

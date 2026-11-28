@@ -77,7 +77,7 @@ async function avancar(page: Page, de: StatusOS, para: StatusOS) {
   await expect(cabecalho(page)).toContainText(ROTULO_STATUS[para].rotulo)
 }
 
-test('serviço Fase A ponta a ponta: cliente, OS, etapas, histórico e técnico', async ({ page }) => {
+test('serviço ponta a ponta: cliente, OS, orçamento, entrega, link do cliente e técnico', async ({ page, browser }) => {
   const nomeLoja = `Loja OS ${run}`
   let linkDono = ''
   let urlOS = ''
@@ -260,6 +260,47 @@ test('serviço Fase A ponta a ponta: cliente, OS, etapas, histórico e técnico'
       await expect(page.getByRole('button', { name: ROTULO_STATUS[s].rotulo, exact: true })).toHaveCount(0)
     }
     expect(await page.content()).not.toContain(SENHA_APARELHO)
+  })
+
+  await test.step('Fase C: loja envia o orçamento e o cliente aprova pelo link, sem login', async () => {
+    await page.goto('/servico/nova')
+    await hidratar(page)
+    await page.getByLabel(/^Buscar cliente/).fill(TELEFONE_DIGITOS)
+    await page.getByRole('button', { name: 'Buscar', exact: true }).click()
+    await page
+      .getByRole('list', { name: 'Clientes encontrados' })
+      .getByRole('button', { name: new RegExp(nomeCliente) })
+      .click()
+    await page.getByLabel(/^Defeito relatado/).fill('Não carrega')
+    await enviarOS(page)
+    await hidratar(page)
+    await avancar(page, 'aberta', 'em_analise')
+
+    await page.getByLabel('Descrição', { exact: true }).fill('Troca do conector')
+    await page.getByLabel('Preço (R$)', { exact: true }).fill('180')
+    await page.getByRole('button', { name: 'Lançar item' }).click()
+    await expect(page.getByText('Item lançado.')).toBeVisible()
+    await page.getByRole('button', { name: 'Marcar como enviado' }).click()
+    await expect(cabecalho(page)).toContainText(ROTULO_STATUS.orcamento_enviado.rotulo)
+
+    const link = await page.getByLabel('Link de acompanhamento do cliente').inputValue()
+    expect(link).toMatch(/\/acompanhar\/[0-9a-f]{48}$/)
+
+    // Outro navegador, sem cookie nenhum: é o celular do cliente.
+    const cliente = await browser.newContext()
+    const celular = await cliente.newPage()
+    await celular.goto(link)
+    await expect(celular.getByRole('heading', { level: 1 })).toContainText('Nº')
+    expect(await celular.content()).not.toContain(CPF_MASCARADO.replace(/\D/g, ''))
+    await hidratar(celular)
+    await celular.getByLabel('Seu nome').fill('Cliente pelo celular')
+    await celular.getByRole('button', { name: /^Aprovar R\$/ }).click()
+    await expect(celular.getByText(/Aprovado em/)).toBeVisible()
+    await cliente.close()
+
+    await page.reload()
+    await expect(cabecalho(page)).toContainText(ROTULO_STATUS.aprovado.rotulo)
+    await expect(historico(page).last()).toContainText('aprovado pelo link por Cliente pelo celular')
   })
 
   await test.step('segunda OS (interna), em análise: o Dono vê "Voltar etapa"', async () => {
