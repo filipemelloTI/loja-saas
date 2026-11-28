@@ -187,6 +187,16 @@ Tudo que mordeu durante a montagem. Formato do projeto: **sintoma → causa → 
 | `getByRole('region', { name: 'Quanto sobrou' })` não acha o bloco | O `Cartao` é uma `<section>` **sem nome acessível**, então não vira "region" | Localizar pela seção que contém o título: `page.locator('section').filter({ has: page.getByRole('heading', { name: '…' }) })` |
 | Teste de banco (pgTAP) que passava começa a falhar depois de rodar o e2e ou de testar na mão | O teste **conta linhas do banco inteiro** (`count(*)` fora da sessão de um usuário) e pega dados reais deixados pelo e2e | Todo `count`/`update` feito como servidor no teste filtra pela loja ou OS **criada no próprio teste** |
 
+### Fase D do Serviço (documentos, fotos, assinatura)
+
+| Sintoma | Causa | Solução |
+|---|---|---|
+| Fotos e assinaturas não sobem em produção ("Não foi possível salvar") | As migrações da Fase D (bucket `os_arquivos` e tabelas `os_fotos` / `os_assinaturas`) não foram aplicadas na nuvem | `npx supabase db push --remote` depois do merge, escolhendo **Yes** na confirmação |
+| Foto do celular passa do limite de 2 MB do bucket | Câmera gera 4 MB ou mais | A tela reduz no próprio aparelho (lado maior 1600 px, JPEG 80%) antes de enviar; não mexer no limite do bucket |
+| A assinatura salva some depois de 1 hora numa página aberta | O endereço da imagem é **assinado e temporário** (bucket privado) | Recarregar a página gera um endereço novo; é o esperado |
+| Ao imprimir o cupom de 80 mm, sai em folha A4 com margem grande | A impressora/driver ignora o `@page` da página | Escolher a impressora térmica e o papel de 80 mm na janela de impressão; desativar "cabeçalhos e rodapés" do navegador |
+| Depois de `TaskStop`/fechar o terminal, `next dev` novo diz **EADDRINUSE :3100**, ou o e2e mostra "This page couldn't load" | O processo `node` do Next continuou vivo segurando a porta; rodar `npm run build` por cima estraga os arquivos que ele serve | Encerrar o processo dono da porta (`Get-NetTCPConnection -LocalPort 3100` → `Stop-Process`) **antes** do build e do e2e |
+
 ### Fase C do Serviço (link do cliente, WhatsApp, garantia)
 
 | Sintoma | Causa | Solução |
