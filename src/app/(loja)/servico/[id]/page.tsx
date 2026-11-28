@@ -11,15 +11,18 @@ import { formatarData, formatarDataHora, formatarDataISO } from '@/lib/formatar'
 import { perfilEfetivo } from '@/lib/guarda'
 import { avancosDe, ehTerminal, podeMudar, ROTULO_STATUS, type StatusOS } from '@/lib/os-status'
 import { ROTULO_APARELHO } from '@/lib/rotulos'
+import { eventoDaEtapa } from '@/lib/whatsapp'
 import { contextoAtual } from '@/lib/sessao'
 import { FormularioLaudo } from '../_componentes/formulario'
 import { OrcamentoDaOS } from '../_componentes/orcamento'
+import { AvisarCliente } from '../_componentes/avisar'
 import { EntregarOS } from '../_componentes/entregar'
 import { PagamentoDaOS } from '../_componentes/pagamento'
 import { PecasDaOS } from '../_componentes/pecas'
 import { SenhaDoAparelho } from '../_componentes/senha'
 import { AcoesStatus } from '../_componentes/status'
 import {
+  carregarAviso,
   carregarFechamento,
   carregarOrcamento,
   carregarOS,
@@ -64,6 +67,7 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
     carregarFechamento(id),
   ])
   if (!os) notFound()
+  const aviso = !os.interna && os.clienteId && !somenteLeitura ? await carregarAviso(os.clienteId, os.tokenPublico) : null
 
   const perfil = ctx ? perfilEfetivo(ctx) : null
   const status = ROTULO_STATUS[os.status]
@@ -203,6 +207,28 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
           />
         )}
       </Cartao>
+
+      {aviso && (
+        <Cartao etiqueta="WhatsApp da loja" titulo="Avisar cliente">
+          <AvisarCliente
+            key={os.status}
+            telefone={aviso.telefone}
+            mensagens={aviso.mensagens}
+            eventoInicial={eventoDaEtapa(os.status)}
+            linkAcompanhamento={aviso.linkAcompanhamento}
+            valores={{
+              cliente: os.clienteNome?.trim().split(/\s+/)[0] ?? null,
+              aparelho: [os.marca, os.modelo].filter(Boolean).join(' ') || ROTULO_APARELHO[os.aparelhoTipo] || 'aparelho',
+              loja: ctx?.loja?.nome ?? null,
+              numero_os: String(os.numero),
+              valor: pagamento.total > 0 ? formatarReais(pagamento.total) : null,
+              servico: orcamento.atual?.itens.map((i) => i.descricao).join(', ') || null,
+              prazo_garantia: null,
+              link: aviso.linkAcompanhamento,
+            }}
+          />
+        </Cartao>
+      )}
 
       {os.status === 'pronto' && !somenteLeitura && (
         <Cartao etiqueta="Saída do aparelho" titulo="Entrega">

@@ -4,6 +4,8 @@ import { carregarOrcamentoCom, type DadosOrcamento } from '@/lib/orcamento-acoes
 import { carregarPecasCom, type DadosPecas } from '@/lib/pecas-acoes'
 import { carregarPagamentosCom, totalDaOSCom, type Pagamento } from '@/lib/pagamento-acoes'
 import { carregarFechamentoCom, type Fechamento } from '@/lib/fechamento'
+import { eventoValido, type Evento } from '@/lib/mensagens'
+import { origemDoSite } from '@/lib/origem'
 import type { StatusOS } from '@/lib/os-status'
 import { perfilEfetivo } from '@/lib/guarda'
 import { exigirArea } from '@/lib/sessao'
@@ -70,6 +72,34 @@ export async function carregarFechamento(osId: string): Promise<Fechamento | nul
   const { supabase, perfil, somenteLeitura } = await base()
   if (perfil !== 'dono' || somenteLeitura) return null
   return carregarFechamentoCom(supabase, osId)
+}
+
+export type DadosAviso = {
+  telefone: string | null
+  mensagens: Partial<Record<Evento, string>>
+  /** Endereço completo do link público desta OS. */
+  linkAcompanhamento: string
+}
+
+/** O que o cartão "Avisar cliente" precisa: telefone do cliente, mensagens da loja e o link público. */
+export async function carregarAviso(clienteId: string | null, tokenPublico: string): Promise<DadosAviso> {
+  const { supabase } = await base()
+  const [cliente, mensagens, origem] = await Promise.all([
+    clienteId
+      ? supabase.from('clientes').select('telefone').eq('id', clienteId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase.from('mensagens_padrao').select('evento, texto'),
+    origemDoSite(),
+  ])
+  return {
+    telefone: (cliente.data?.telefone as string | undefined) ?? null,
+    mensagens: Object.fromEntries(
+      ((mensagens.data ?? []) as { evento: string; texto: string }[])
+        .filter((m) => eventoValido(m.evento))
+        .map((m) => [m.evento, m.texto]),
+    ),
+    linkAcompanhamento: `${origem}/acompanhar/${tokenPublico}`,
+  }
 }
 
 export type ServicoCatalogo = { id: string; nome: string; preco: number }

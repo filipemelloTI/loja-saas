@@ -199,6 +199,8 @@ export type OSCompleta = {
   status: StatusOS
   encerradaEm: string | null
   criadoEm: string
+  /** Token do link público de acompanhamento (vai na mensagem ao cliente). */
+  tokenPublico: string
   checklist: { nome: string; marcado: boolean; observacao: string | null }[]
   historico: {
     deStatus: StatusOS | null
@@ -216,7 +218,7 @@ export type OSCompleta = {
 type Linha = Record<string, unknown>
 
 const COLUNAS_OS =
-  'id, numero, interna, cliente_id, aparelho_tipo, marca, modelo, cor, imei, defeito_relatado, acessorios, observacao, tecnico_id, laudo, previsao_entrega, status, encerrada_em, criado_em'
+  'id, numero, interna, cliente_id, aparelho_tipo, marca, modelo, cor, imei, defeito_relatado, acessorios, observacao, tecnico_id, laudo, previsao_entrega, status, encerrada_em, criado_em, token_publico'
 
 /** Quem pode ver a senha do aparelho (a função do banco confere de novo; aqui só se poupa a ida à rede). */
 const PERFIS_COM_SENHA: Perfil[] = ['dono', 'tecnico']
@@ -309,6 +311,7 @@ export async function carregarOSCom(deps: { supabase: SupabaseClient; perfil: Pe
     status,
     encerradaEm: o.encerrada_em as string | null,
     criadoEm: o.criado_em as string,
+    tokenPublico: o.token_publico as string,
     checklist: ((checklist.data ?? []) as Linha[]).map((c) => ({
       nome: c.nome as string,
       marcado: c.marcado as boolean,
