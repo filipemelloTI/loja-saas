@@ -77,8 +77,8 @@ export async function carregarFechamento(osId: string): Promise<Fechamento | nul
 export type DadosAviso = {
   telefone: string | null
   mensagens: Partial<Record<Evento, string>>
-  /** Endereço completo do link público desta OS. */
-  linkAcompanhamento: string
+  /** Endereço completo do link público desta OS; `null` se o endereço do site não está configurado. */
+  linkAcompanhamento: string | null
 }
 
 /** O que o cartão "Avisar cliente" precisa: telefone do cliente, mensagens da loja e o link público. */
@@ -89,7 +89,11 @@ export async function carregarAviso(clienteId: string | null, tokenPublico: stri
       ? supabase.from('clientes').select('telefone').eq('id', clienteId).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from('mensagens_padrao').select('evento, texto'),
-    origemDoSite(),
+    // Sem o endereço do site configurado, o cartão segue sem o link (a página da OS não pode cair).
+    origemDoSite().catch((e: unknown) => {
+      console.error('carregarAviso: endereço do site indisponível', e instanceof Error ? e.message : e)
+      return null
+    }),
   ])
   return {
     telefone: (cliente.data?.telefone as string | undefined) ?? null,
@@ -98,7 +102,57 @@ export async function carregarAviso(clienteId: string | null, tokenPublico: stri
         .filter((m) => eventoValido(m.evento))
         .map((m) => [m.evento, m.texto]),
     ),
-    linkAcompanhamento: `${origem}/acompanhar/${tokenPublico}`,
+    linkAcompanhamento: origem ? `${origem}/acompanhar/${tokenPublico}` : null,
+  }
+}
+
+export type DadosGarantia = {
+  /** Prazo que a OS terá ao ser entregue (ajuste do Dono, catálogo ou padrão da loja). */
+  prevista: number | null
+  /** Número da OS original, quando esta é de garantia. */
+  numeroOriginal: number | null
+}
+
+export async function carregarGarantia(osId: string, garantiaDe: string | null): Promise<DadosGarantia> {
+  const { supabase } = await base()
+  const [prevista, original] = await Promise.all([
+    supabase.rpc('garantia_prevista_os', { os: osId }),
+    garantiaDe
+      ? supabase.from('ordens_servico').select('numero').eq('id', garantiaDe).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ])
+  return {
+    prevista: (prevista.data as number | null) ?? null,
+    numeroOriginal: (original.data?.numero as number | undefined) ?? null,
+  }
+}
+
+export type DadosTermo = {
+  loja: { cnpj: string | null; endereco: string | null; telefone: string | null; textoTermos: string | null }
+  cliente: { nome: string; telefone: string | null } | null
+  condicoes: string[]
+}
+
+/** O que o termo de garantia imprime além da OS: dados da loja, do cliente e as condições. */
+export async function carregarTermo(clienteId: string | null): Promise<DadosTermo> {
+  const { supabase } = await base()
+  const [config, condicoes, cliente] = await Promise.all([
+    supabase.from('config_loja').select('cnpj, endereco, telefone, texto_termos').maybeSingle(),
+    supabase.from('condicoes_garantia').select('texto').order('ordem'),
+    clienteId
+      ? supabase.from('clientes').select('nome, telefone').eq('id', clienteId).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ])
+  const c = config.data as Record<string, string | null> | null
+  return {
+    loja: {
+      cnpj: c?.cnpj ?? null,
+      endereco: c?.endereco ?? null,
+      telefone: c?.telefone ?? null,
+      textoTermos: c?.texto_termos ?? null,
+    },
+    cliente: cliente.data ? { nome: cliente.data.nome as string, telefone: (cliente.data.telefone as string | null) ?? null } : null,
+    condicoes: ((condicoes.data ?? []) as { texto: string }[]).map((x) => x.texto),
   }
 }
 

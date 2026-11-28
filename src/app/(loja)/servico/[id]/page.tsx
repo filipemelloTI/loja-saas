@@ -17,6 +17,7 @@ import { FormularioLaudo } from '../_componentes/formulario'
 import { OrcamentoDaOS } from '../_componentes/orcamento'
 import { AvisarCliente } from '../_componentes/avisar'
 import { EntregarOS } from '../_componentes/entregar'
+import { GarantiaDaOS } from '../_componentes/garantia'
 import { PagamentoDaOS } from '../_componentes/pagamento'
 import { PecasDaOS } from '../_componentes/pecas'
 import { SenhaDoAparelho } from '../_componentes/senha'
@@ -24,6 +25,7 @@ import { AcoesStatus } from '../_componentes/status'
 import {
   carregarAviso,
   carregarFechamento,
+  carregarGarantia,
   carregarOrcamento,
   carregarOS,
   carregarPagamento,
@@ -68,18 +70,21 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
   ])
   if (!os) notFound()
   const aviso = !os.interna && os.clienteId && !somenteLeitura ? await carregarAviso(os.clienteId, os.tokenPublico) : null
+  const deGarantia = os.garantiaDe !== null
+  const garantia = os.interna ? null : await carregarGarantia(os.id, os.garantiaDe)
+  const prazoGarantia = os.garantiaDias ?? garantia?.prevista ?? null
 
   const perfil = ctx ? perfilEfetivo(ctx) : null
   const status = ROTULO_STATUS[os.status]
   const terminal = ehTerminal(os.status)
   // "Entregue" só pelo botão Entregar (congela os números). Na OS de cliente, enviar, aprovar e
   // recusar saem do bloco Orçamento, que registra quem aprovou e trava os itens.
-  const peloOrcamento: StatusOS[] = os.interna ? [] : ['orcamento_enviado', 'aprovado', 'recusado']
+  const peloOrcamento: StatusOS[] = os.interna || deGarantia ? [] : ['orcamento_enviado', 'aprovado', 'recusado']
   const avancos = avancosDe(os.status).filter((s) => s !== 'entregue' && !peloOrcamento.includes(s))
   const dicaEtapa =
     os.status === 'pronto'
       ? 'Para encerrar, use “Entregar aparelho” no bloco Entrega.'
-      : !os.interna && (os.status === 'em_analise' || os.status === 'aberta')
+      : !os.interna && !deGarantia && (os.status === 'em_analise' || os.status === 'aberta')
         ? 'Com o orçamento pronto, marque como enviado ou registre a aprovação no bloco Orçamento.'
         : os.status === 'orcamento_enviado'
           ? 'Aguardando a resposta do cliente: registre no bloco Orçamento.'
@@ -158,7 +163,19 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
         </Cartao>
       )}
 
-      {(!os.interna || orcamento.atual) && (
+      {deGarantia && (
+        <Cartao etiqueta="Sem cobrança" titulo="OS de garantia">
+          <p className="text-tinta">
+            Retorno em garantia da{' '}
+            <Link href={`/servico/${os.garantiaDe}`} className="font-semibold text-marca hover:underline">
+              OS <span className="numeros">Nº {garantia?.numeroOriginal ?? '—'}</span>
+            </Link>
+            . O cliente não paga e não há comissão; vale a garantia da OS original.
+          </p>
+        </Cartao>
+      )}
+
+      {((!os.interna && !deGarantia) || orcamento.atual) && (
         <Cartao etiqueta="Para o cliente" titulo="Orçamento">
           <OrcamentoDaOS
             key={orcamento.atual?.id ?? 'novo'}
@@ -180,7 +197,7 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
         />
       </Cartao>
 
-      {(!os.interna || pagamento.pagamentos.length > 0) && (
+      {((!os.interna && !deGarantia) || pagamento.pagamentos.length > 0) && (
         <Cartao etiqueta="Do cliente" titulo="Pagamento">
           <PagamentoDaOS
             key={os.status}
@@ -223,7 +240,7 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
               numero_os: String(os.numero),
               valor: pagamento.total > 0 ? formatarReais(pagamento.total) : null,
               servico: orcamento.atual?.itens.map((i) => i.descricao).join(', ') || null,
-              prazo_garantia: null,
+              prazo_garantia: prazoGarantia !== null ? `${prazoGarantia} dias` : null,
               link: aviso.linkAcompanhamento,
             }}
           />
@@ -236,7 +253,23 @@ async function Conteudo({ params }: { params: PageProps<'/servico/[id]'>['params
             osId={os.id}
             falta={falta}
             semCusto={pecas.semCusto}
-            semOrcamentoAprovado={!os.interna && orcamento.atual?.status !== 'aprovado'}
+            semOrcamentoAprovado={!os.interna && !deGarantia && orcamento.atual?.status !== 'aprovado'}
+          />
+        </Cartao>
+      )}
+
+      {!os.interna && !deGarantia && os.status !== 'devolvido' && (
+        <Cartao etiqueta="Do serviço" titulo="Garantia">
+          <GarantiaDaOS
+            key={`${os.status}-${os.garantiaAjusteDias ?? ''}`}
+            osId={os.id}
+            encerrada={terminal}
+            encerradaEm={os.encerradaEm}
+            garantiaDias={os.garantiaDias}
+            garantiaAjusteDias={os.garantiaAjusteDias}
+            prevista={garantia?.prevista ?? null}
+            podeAjustar={perfil === 'dono' && !somenteLeitura}
+            bloqueado={somenteLeitura}
           />
         </Cartao>
       )}

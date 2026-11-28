@@ -72,13 +72,14 @@ os dados — admin, planos, lojas — são criados pelos passos 6, 7 e 8.
 
 ### 4. Variáveis de ambiente no Netlify — [conta sua]
 
-**Site settings → Environment variables** → adicione as três:
+**Site settings → Environment variables** → adicione as quatro:
 
 | Nome | Valor | Observação |
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Project URL do passo 1 | público |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon/public key | público |
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role key | **segredo** — marque como sensível |
+| `NEXT_PUBLIC_SITE_URL` | endereço do site, ex.: `https://seu-site.netlify.app` (sem barra no fim) | público — sem ela, os links de definir senha e de acompanhamento da OS não são gerados |
 
 Depois de salvar, **refaça o deploy** (Deploys → Trigger deploy → Deploy site) para o build
 pegar as variáveis.

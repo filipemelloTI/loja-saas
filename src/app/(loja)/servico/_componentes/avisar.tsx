@@ -24,7 +24,7 @@ export function AvisarCliente({
   mensagens: Partial<Record<Evento, string>>
   valores: Record<string, string | null>
   eventoInicial: Evento | null
-  linkAcompanhamento: string
+  linkAcompanhamento: string | null
 }) {
   const disponiveis = EVENTOS.filter((e) => e !== 'venda_concluida' && mensagens[e])
   const montar = (e: Evento | '') => (e ? preencherMensagem(mensagens[e] ?? '', valores) : '')
@@ -34,6 +34,7 @@ export function AvisarCliente({
   const link = linkWhatsApp(telefone, texto)
 
   async function copiar() {
+    if (!linkAcompanhamento) return
     try {
       await navigator.clipboard.writeText(linkAcompanhamento)
       setCopiado('link')
@@ -91,6 +92,11 @@ export function AvisarCliente({
           </p>
         ))}
 
+      {linkAcompanhamento === null ? (
+        <p className="border-t border-linha pt-4 text-sm text-tinta-suave">
+          O link de acompanhamento do cliente não está disponível agora. As mensagens saem sem ele.
+        </p>
+      ) : (
       <div className="flex flex-col gap-1.5 border-t border-linha pt-4">
         <Rotulo htmlFor="aviso-link">Link de acompanhamento do cliente</Rotulo>
         <div className="flex flex-wrap gap-2">
@@ -109,6 +115,7 @@ export function AvisarCliente({
           </a>
         </div>
       </div>
+      )}
     </div>
   )
 }

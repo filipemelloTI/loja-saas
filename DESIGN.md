@@ -68,6 +68,7 @@ clara **e** escura. Uma cor crua quebra o tema escuro e é considerada defeito.
 | `perigo` / `perigo-suave` | erro, ação destrutiva, asterisco de obrigatório |
 | `trilho` / `sobre-trilho` / `trilho-ativo` | barra lateral no computador |
 | `foco` | anel de foco do teclado |
+| `folha` / `sobre-folha` / `folha-suave` / `folha-linha` | documento impresso (termo, comprovante): papel claro **nos dois temas**, de propósito |
 
 Cada token tem par claro/escuro definido em `:root` e em `@media (prefers-color-scheme: dark)`.
 **Ao criar um token novo, defina os dois.**

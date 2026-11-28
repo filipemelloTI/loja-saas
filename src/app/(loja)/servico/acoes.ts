@@ -15,6 +15,7 @@ import {
   type DadosItem,
 } from '@/lib/orcamento-acoes'
 import { entregarOSCom } from '@/lib/fechamento'
+import { abrirGarantiaCom, ajustarGarantiaCom } from '@/lib/garantia-acoes'
 import { registrarPagamentoCom, removerPagamentoCom, type DadosPagamento } from '@/lib/pagamento-acoes'
 import { adicionarPecaCom, removerPecaCom, salvarCustoPecaCom, type DadosPeca } from '@/lib/pecas-acoes'
 import type { Resultado } from '@/lib/resultado'
@@ -130,4 +131,14 @@ export async function removerPagamento(pagamentoId: string) {
 
 export async function entregarOS(osId: string) {
   return comRefresh(entregarOSCom(await dependencias(), osId))
+}
+
+// Garantia -------------------------------------------------------------------
+
+export async function ajustarGarantia(osId: string, dias: number | null) {
+  return comRefresh(ajustarGarantiaCom(await dependencias(), osId, dias))
+}
+
+export async function abrirGarantia(osId: string, defeito: string) {
+  return abrirGarantiaCom(await dependencias(), osId, defeito)
 }
